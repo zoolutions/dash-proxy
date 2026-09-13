@@ -1,0 +1,33 @@
+lode/review/cert-store-export.md
+  s_3598d27e5630bd::t_e64688f0c6e7cd 1-80
+lode/review/sources-and-refresh.md
+  s_3598d27e5630bd::t_81d72a95c91f18 1-78
+lode/review/dynamic-domains.md
+  s_3598d27e5630bd::t_32b46e5af989bb 1-81
+lode/review/certs-directories-and-renewal.md
+  s_3598d27e5630bd::t_276c5f7b20ace5 1-91
+lode/review/acme-providers.md
+  s_3598d27e5630bd::t_9406a409b15fc1 1-85
+lode/review/cert-store-restore.md
+  s_3598d27e5630bd::t_d54bdc1accdb62 1-110
+lode/review/dynamic-redirects.md
+  s_3598d27e5630bd::t_12093eb84350f9 1-118
+lode/review/certs-issuance.md
+  s_3598d27e5630bd::t_9fcf4a921577c7 1-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d749b2663ce1f05485c8e6f4bcf6353777e31a35",
+  "prompts": {},
+  "sessions": {
+    "s_3598d27e5630bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64306a32-a4ec-4445-b858-a6c3a74557c8",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}

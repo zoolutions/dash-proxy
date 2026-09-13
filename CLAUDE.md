@@ -2,6 +2,10 @@
 
 **dash-proxy** (`zoolutions/dash-proxy`). Started as a fork of [basecamp/kamal-proxy](https://github.com/basecamp/kamal-proxy); the break is now clean — no upstream remote, no sync branch, their code arrives only by deliberate cherry-pick if ever. Carries the cert features they don't ship: SAN certificate batching and wildcard certs via DNS-01. Published as `ghcr.io/zoolutions/dash-proxy`; the Go module, binary, RPC service, socket, and image title label all stay `kamal-proxy` on purpose until the server-artifact rename ships a migration bridge. Consumed by the `dash` gem in `../kamal`.
 
+## Memory
+
+Durable project memory lives in `lode/` (index: `lode/lode-map.md`). Read it before exploring the code. `lode/review/` holds accepted review findings as rules about the system; `/lode:gate` enforces them before any push, and `/lode:learn` adds to them. `lode/workflow.md` is the profile the shared `/lode:` workflow commands read.
+
 ## Tech Stack
 
 - **Go**: version from `go.mod` (tracks upstream's toolchain bumps)
@@ -70,24 +74,35 @@ Tag push (`vX.Y.Z.N`) → `.github/workflows/docker-publish.yml` → multi-arch 
 
 ## Slash Commands
 
+Shared commands come from the `lode@zoolutions` plugin and read `lode/workflow.md` for everything repo-specific.
+
 | Command | Purpose |
 |---------|---------|
-| `/lfg` | Full autonomous workflow: branch off `main` → understand → plan → TDD → verify → PR into `main` |
-| `/plan` | Read-only planning → GitHub issue or `docs/plans/` markdown (execute with `/lfg`) |
+| `/lode:lfg` | Full autonomous workflow: branch off `main` → understand → plan → TDD → verify → PR into `main` |
+| `/lode:plan` | Read-only planning → GitHub issue or `docs/plans/` markdown (execute with `/lode:lfg`) |
+| `/lode:tdd` | Enforce RED → GREEN → REFACTOR with Go table-driven tests |
+| `/lode:review-pr` | Full PR pass: conflicts, then CI failures, then review comments |
+| `/lode:finish-prs` | Drive a stack of open PRs to merge-ready, one at a time, in order |
+| `/lode:debug-flaky` | Root-cause an intermittent test — evidence → repro → stress-proofed fix |
+| `/lode:gate` | Pre-PR gate: fresh-context review against the rules and `lode/review/`, loops until clean |
+| `/lode:learn` | Write accepted review findings into `lode/review/` |
+| `/lode:sync` | Keep `lode/` true to the code after a change; `audit`, `handover` |
+
+Repo-local commands that the plugin does not cover:
+
+| Command | Purpose |
+|---------|---------|
 | `/architect` | Coordinate work across the cmd → RPC → server layers |
-| `/tdd` | Enforce RED → GREEN → REFACTOR with Go table-driven tests |
 | `/security` | Audit TLS/cert handling, request parsing, header forwarding, ACME, the unix socket |
 | `/perf` | Baseline vs `main` in a worktree via `make bench` on the real hot paths |
-| `/review-pr` | Review a PR for pattern + fork-constraint compliance |
-| `/github-review-pr` | Full PR pass: fix CI failures, then process review comments |
-| `/github-review-failures` | Diagnose + fix CI failures until green |
-| `/github-review-comments` | Process unresolved PR review comments |
+| `/review-pr` | Review a PR for pattern + constraint compliance (read-only; `/lode:review-pr` is the one that fixes) |
 
-Commands pin a model tier via frontmatter aliases (`sonnet` implementation, `opus` orchestration/security/review, `fable` read-only planning) so they track the latest model per tier.
+The repo-local commands pin a model tier via frontmatter aliases (`sonnet` implementation, `opus` orchestration/security/review, `fable` read-only planning) so they track the latest model per tier.
 
 ## More Documentation
 
 - `ROADMAP.md` — proxy-side roadmap with code anchors (strategy + sequencing in ../kamal/ROADMAP.md)
 - `.claude/rules/` — coding-style, git-workflow, testing, agents, performance, upstream-sync
-- `.claude/commands/` — the slash commands above
+- `.claude/commands/` — the repo-local slash commands above
+- `lode/` — durable memory: subsystem summaries, terminology, practices, the workflow profile and the review rules
 - Gem fork: `../kamal/CLAUDE.md` — gem-side contract and release ordering

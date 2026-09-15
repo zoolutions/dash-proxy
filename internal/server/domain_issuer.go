@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,6 +66,11 @@ type domainIssuer struct {
 	queue    []*issueRequest
 	queued   map[string]struct{}
 	inflight map[string]struct{}
+	// inflightIdentifiers holds the planned identifiers of orders in
+	// progress. A wildcard planned by two batches must be ordered once: the
+	// CA limits duplicate certificates per identifier set, and the second
+	// batch's names are covered the moment the first order lands.
+	inflightIdentifiers map[string]struct{}
 
 	wake   chan struct{}
 	sem    chan struct{}
@@ -102,10 +108,12 @@ func newDomainIssuer(manager *SANCertManager, quarantine *domainQuarantine, conf
 		queue:      []*issueRequest{},
 		queued:     make(map[string]struct{}),
 		inflight:   make(map[string]struct{}),
-		wake:       make(chan struct{}, 1),
-		sem:        make(chan struct{}, config.MaxConcurrentOrders),
-		ctx:        ctx,
-		cancel:     cancel,
+
+		inflightIdentifiers: make(map[string]struct{}),
+		wake:                make(chan struct{}, 1),
+		sem:                 make(chan struct{}, config.MaxConcurrentOrders),
+		ctx:                 ctx,
+		cancel:              cancel,
 	}
 }
 
@@ -306,9 +314,7 @@ func (i *domainIssuer) batchSizeFor(service string) int {
 
 // issue runs one ACME order for a batch of requests.
 func (i *domainIssuer) issue(batch []*issueRequest) {
-	domains := make([]string, 0, len(batch))
-	requests := make(map[string]*issueRequest, len(batch))
-
+	requested := make([]*issueRequest, 0, len(batch))
 	for _, request := range batch {
 		if i.config.Preflight != nil && !i.manager.HasCertificate(request.domain) {
 			if err := i.config.Preflight(request.domain); err != nil {
@@ -322,51 +328,150 @@ func (i *domainIssuer) issue(batch []*issueRequest) {
 				continue
 			}
 		}
-		domains = append(domains, request.domain)
-		requests[request.domain] = request
+		requested = append(requested, request)
 	}
 
-	if len(domains) == 0 {
-		i.finishBatch(batch)
+	orders, dropped := i.planOrders(requested)
+
+	// Everything not handed to an order releases its hold here: probe
+	// failures (recorded above) and names covered by an identifier already
+	// in flight (covered once that order lands; the next poll sees it).
+	released := dropped
+	for _, request := range batch {
+		if !slices.Contains(requested, request) {
+			released = append(released, request)
+		}
+	}
+	i.finishBatch(released)
+
+	if len(orders) == 0 {
 		i.notifyChange()
 		return
 	}
 
-	slices.Sort(domains)
+	for _, order := range orders {
+		i.issueOrder(order)
+	}
+}
+
+// issueOrder is one ACME order planned from a batch: the identifiers to
+// order, the requests they answer for, and which identifier each request was
+// planned into (itself, or its zone's wildcard).
+type issueOrder struct {
+	identifiers  []string
+	requests     []*issueRequest
+	identifierOf map[string]string
+}
+
+// planOrders rewrites a batch into orders: the manager plans each name's
+// identifier (a retried request is never collapsed — it is the concrete
+// fallback after its wildcard failed), the planned set splits by challenge
+// solvability so no order spans DNS providers or drags a foreign name into a
+// wildcard order, and each partition becomes one order. Requests whose
+// wildcard is already in flight are returned as dropped rather than ordered.
+func (i *domainIssuer) planOrders(requests []*issueRequest) (orders []*issueOrder, dropped []*issueRequest) {
+	collapsible := []string{}
+	identifierOf := map[string]string{}
+	for _, request := range requests {
+		if request.retried {
+			identifierOf[request.domain] = request.domain
+			continue
+		}
+		collapsible = append(collapsible, request.domain)
+	}
+	for domain, identifier := range i.manager.planDynamicIdentifiers(collapsible, i.quarantine.IsQuarantined) {
+		identifierOf[domain] = identifier
+	}
+
+	identifiers := []string{}
+	for _, request := range requests {
+		if identifier := identifierOf[request.domain]; !slices.Contains(identifiers, identifier) {
+			identifiers = append(identifiers, identifier)
+		}
+	}
+	slices.Sort(identifiers)
+
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	for _, partition := range i.manager.splitByProviderZone(identifiers) {
+		order := &issueOrder{identifierOf: identifierOf}
+		for _, identifier := range partition {
+			if _, busy := i.inflightIdentifiers[identifier]; busy && strings.HasPrefix(identifier, "*.") {
+				slog.Info("Wildcard order already in flight; releasing covered names for the next poll",
+					"identifier", identifier)
+				continue
+			}
+			order.identifiers = append(order.identifiers, identifier)
+		}
+		for _, request := range requests {
+			if slices.Contains(order.identifiers, identifierOf[request.domain]) {
+				order.requests = append(order.requests, request)
+			} else if slices.Contains(partition, identifierOf[request.domain]) {
+				dropped = append(dropped, request)
+			}
+		}
+		if len(order.identifiers) == 0 {
+			continue
+		}
+		for _, identifier := range order.identifiers {
+			i.inflightIdentifiers[identifier] = struct{}{}
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, dropped
+}
+
+// releaseIdentifiers drops the in-flight hold on an order's identifiers.
+func (i *domainIssuer) releaseIdentifiers(identifiers []string) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	for _, identifier := range identifiers {
+		delete(i.inflightIdentifiers, identifier)
+	}
+}
+
+func (i *domainIssuer) issueOrder(order *issueOrder) {
+	defer i.releaseIdentifiers(order.identifiers)
 
 	resource, err := i.config.Obtainer.Obtain(certificate.ObtainRequest{
-		Domains: domains,
+		Domains: order.identifiers,
 		Bundle:  true,
 	})
 	if err != nil {
 		if i.ctx.Err() != nil {
 			// The shutdown broke the order (listeners are closing); do not
 			// hold that against the domains.
-			slog.Info("Certificate order aborted by shutdown", "domains", domains)
-			i.finishBatch(batch)
+			slog.Info("Certificate order aborted by shutdown", "domains", order.identifiers)
+			i.finishBatch(order.requests)
 			return
 		}
-		i.handleObtainFailure(batch, domains, requests, err)
+		i.handleObtainFailure(order, err)
 		i.notifyChange()
 		return
 	}
 
-	if _, err := i.manager.adoptCertificate(resource, domains); err != nil {
-		slog.Error("Failed to adopt issued certificate", "domains", domains, "error", err)
-		for _, domain := range domains {
-			i.quarantine.RecordFailure(domain, quarantineACME)
+	if _, err := i.manager.adoptCertificate(resource, order.identifiers); err != nil {
+		slog.Error("Failed to adopt issued certificate", "domains", order.identifiers, "error", err)
+		for _, request := range order.requests {
+			i.quarantine.RecordFailure(request.domain, quarantineACME)
 		}
-		i.finishBatch(batch)
+		i.finishBatch(order.requests)
 		i.notifyChange()
 		return
 	}
 
-	for _, domain := range domains {
-		i.quarantine.Clear(domain)
+	for _, identifier := range order.identifiers {
+		i.quarantine.Clear(identifier)
 	}
-	i.finishBatch(batch)
+	for _, request := range order.requests {
+		i.quarantine.Clear(request.domain)
+	}
+	i.finishBatch(order.requests)
 
-	slog.Info("Dynamic certificate issued", "domains", domains)
+	slog.Info("Dynamic certificate issued", "domains", order.identifiers)
 	i.notifyChange()
 }
 
@@ -374,29 +479,36 @@ func (i *domainIssuer) issue(batch []*issueRequest) {
 // the survivors exactly once. Survivors that already had their retry are
 // quarantined too, so a failing batch cannot loop against ACME rate limits;
 // the poller re-requests them after the backoff expires.
-func (i *domainIssuer) handleObtainFailure(batch []*issueRequest, domains []string, requests map[string]*issueRequest, err error) {
+//
+// A failed wildcard identifier is a culprit in its own right — it takes the
+// ladder, and the planner keeps its zone concrete while it is held — but the
+// names it covered are not: they survive, and their once-only retry orders
+// them concretely, where a mapped zone's DNS-01 failure can still fall back
+// to HTTP-01. That is what keeps a broken DNS token from taking a zone off
+// the air.
+func (i *domainIssuer) handleObtainFailure(order *issueOrder, err error) {
 	if limit, ok := parseRateLimited(err); ok {
-		i.handleRateLimited(batch, domains, requests, limit, err)
+		i.handleRateLimited(order, limit, err)
 		return
 	}
 
-	failed := identifyFailedDomains(err, domains, i.config.Preflight, i.manager.hasDNSProviderFor)
+	failed := identifyFailedDomains(err, order.identifiers, i.config.Preflight, i.manager.hasDNSProviderFor)
 
-	slog.Warn("Certificate order failed", "domains", domains, "failed", failed, "error", err)
+	slog.Warn("Certificate order failed", "domains", order.identifiers, "failed", failed, "error", err)
 
-	for _, domain := range failed {
-		i.quarantine.RecordFailure(domain, quarantineACME)
+	for _, identifier := range failed {
+		i.quarantine.RecordFailure(identifier, quarantineACME)
 	}
 
 	survivors := []*issueRequest{}
-	for _, domain := range domains {
-		if slices.Contains(failed, domain) {
+	for _, request := range order.requests {
+		identifier := order.identifierOf[request.domain]
+		if slices.Contains(failed, identifier) && !strings.HasPrefix(identifier, "*.") {
 			continue
 		}
 
-		request := requests[domain]
 		if request.retried {
-			i.quarantine.RecordFailure(domain, quarantineACME)
+			i.quarantine.RecordFailure(request.domain, quarantineACME)
 			continue
 		}
 		survivors = append(survivors, request)
@@ -404,7 +516,7 @@ func (i *domainIssuer) handleObtainFailure(batch []*issueRequest, domains []stri
 
 	// Outcomes are recorded; release the in-flight hold before re-enqueueing
 	// so the survivors are not dropped as in-flight at the next dequeue.
-	i.finishBatch(batch)
+	i.finishBatch(order.requests)
 
 	i.mu.Lock()
 	for _, request := range survivors {
@@ -422,32 +534,41 @@ func (i *domainIssuer) handleObtainFailure(batch []*issueRequest, domains []stri
 // order: the named culprits hold until the server's advertised retry time,
 // and every other member is re-submitted immediately WITHOUT spending its
 // once-only retry — each round removes at least one identifier, so the loop
-// is bounded by the batch size. A rejection naming no member is account-level:
-// the whole batch holds, until the advertised time when one was given, on the
-// ladder otherwise, because any retry before then burns the same budget.
-func (i *domainIssuer) handleRateLimited(batch []*issueRequest, domains []string, requests map[string]*issueRequest, limit acmeRateLimit, err error) {
-	failed := rateLimitedDomains(limit, domains)
-	if len(failed) == 0 {
-		failed = domains
+// is bounded by the batch size. Names covered by a held wildcard re-submit
+// too: the planner keeps them concrete while the wildcard is held. A
+// rejection naming no member is account-level: the whole order holds, names
+// included, until the advertised time when one was given, on the ladder
+// otherwise, because any retry before then burns the same budget.
+func (i *domainIssuer) handleRateLimited(order *issueOrder, limit acmeRateLimit, err error) {
+	failed := rateLimitedDomains(limit, order.identifiers)
+	accountLevel := len(failed) == 0
+	if accountLevel {
+		failed = order.identifiers
 	}
 
-	slog.Warn("Certificate order rate-limited", "domains", domains, "failed", failed,
+	slog.Warn("Certificate order rate-limited", "domains", order.identifiers, "failed", failed,
 		"retryAfter", limit.retryAfter, "error", err)
 
-	for _, domain := range failed {
-		i.quarantine.RecordRateLimited(domain, limit.retryAfter)
+	for _, identifier := range failed {
+		i.quarantine.RecordRateLimited(identifier, limit.retryAfter)
 	}
 
 	survivors := []*issueRequest{}
-	for _, domain := range domains {
-		if !slices.Contains(failed, domain) {
-			survivors = append(survivors, requests[domain])
+	for _, request := range order.requests {
+		identifier := order.identifierOf[request.domain]
+		if accountLevel {
+			i.quarantine.RecordRateLimited(request.domain, limit.retryAfter)
+			continue
 		}
+		if slices.Contains(failed, identifier) && !strings.HasPrefix(identifier, "*.") {
+			continue
+		}
+		survivors = append(survivors, request)
 	}
 
 	// Outcomes are recorded; release the in-flight hold before re-enqueueing
 	// so the survivors are not dropped as in-flight at the next dequeue.
-	i.finishBatch(batch)
+	i.finishBatch(order.requests)
 
 	i.mu.Lock()
 	for _, request := range survivors {

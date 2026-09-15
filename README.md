@@ -1056,8 +1056,10 @@ must return:
 {"domains": ["customer1.com", "www.customer2.org"]}
 ```
 
-Wildcard entries (`*.example.com`) are skipped (they need DNS-01), invalid
-hostnames are skipped, and payloads over 1MB or 10,000 entries are rejected.
+Wildcard entries (`*.example.com`) are skipped — the proxy decides on its own
+when a zone's names are better served by a wildcard, see [Wildcards for
+dynamic domains](#wildcards-for-dynamic-domains) — invalid hostnames are
+skipped, and payloads over 1MB or 10,000 entries are rejected.
 Set `KAMAL_PROXY_DOMAINS_TOKEN` to send `Authorization: Bearer <token>` with
 each poll.
 
@@ -1214,6 +1216,37 @@ startup, so a mapping naming a provider whose credentials are absent fails the
 boot rather than the first issuance. Mappings are always explicit: `auto` can
 only be the bare default. The same syntax works in the environment variable,
 comma-separated: `ACME_DNS_PROVIDER=platform.example=cloudflare,hetzner`.
+
+**Wildcards for dynamic domains**
+
+The grouping above applies to `--host` names. A name learned from a
+`--tls-domains-source` is tenant-owned and may sit in any zone, so the proxy
+never guesses a wildcard for it from DNS structure alone — that is how a
+foreign-zone name can end up in an order nothing can validate. Dynamic names
+collapse under exactly one signal: a `zone=provider` mapping. Mapping a zone
+is the operator asserting DNS control over it, and with `--acme-prefer-wildcard`
+(the default) every single-label name directly under a mapped zone is ordered
+as that zone's wildcard, with the apex and deeper names riding the same order
+as concrete identifiers. The default provider and `auto` never collapse a
+dynamic name.
+
+```bash
+dash-proxy run --acme-email admin@example.com --acme-dns-provider platform.example=cloudflare
+dash-proxy deploy app --target web-1:3000 --tls --tls-domains-source /api/v1/domains
+# {"domains": ["a.platform.example", "b.platform.example", "platform.example", "customer.net"]}
+# → one order for *.platform.example + platform.example (DNS-01), one for customer.net (HTTP-01)
+```
+
+A name the wildcard covers — including one that appears in the source later —
+is served from it without an order. Adopting a wildcard also takes over every
+covered name that was certified on its own, so those certificates retire at
+the next renewal check instead of renewing forever; a zone that was certified
+one name at a time converges on its wildcard the first time any of its names
+renews. A wildcard order that fails does not take the zone off the air: the
+wildcard identifier backs off on the quarantine ladder, and the names it
+covered retry once as concrete identifiers, where `--acme-http-fallback` can
+still answer. `dash-proxy domains list` shows the covered names as certified;
+the wildcard itself is visible in the metrics gauge for wildcard certificates.
 
 **Using Let's Encrypt staging environment:**
 

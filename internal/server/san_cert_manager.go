@@ -717,6 +717,7 @@ func (m *SANCertManager) adoptCertificateAt(resource *certificate.Resource, sort
 	for _, d := range sortedDomains {
 		m.domainToCert[d] = certID
 	}
+	m.adoptWildcardCoverageLocked(managed)
 	m.mu.Unlock()
 
 	if err := m.saveCertificate(certID, resource); err != nil {

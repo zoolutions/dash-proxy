@@ -291,8 +291,21 @@ func (r *certRenewer) renew(cert *ManagedCert) (deferred bool) {
 	}()
 	slices.Sort(domains)
 
+	// A name under an explicitly mapped zone renews as the zone's wildcard
+	// (planDynamicIssuance): the first such renewal issues the wildcard, and
+	// adoption hands it every covered name, so the zone's remaining per-name
+	// certificates retire instead of renewing. A changed identifier set is
+	// not a renewal in the CA's eyes, so it carries no ARI replaces marker.
+	collapsed := false
+	if planned := r.manager.planDynamicIssuance(domains, r.quarantine.IsQuarantined); !slices.Equal(planned, domains) {
+		slog.Info("Renewing under the zone wildcard",
+			"certificate", cert.Identifier, "domains", domains, "planned", planned)
+		domains = planned
+		collapsed = true
+	}
+
 	replaces := ""
-	if leaf := certLeaf(cert); leaf != nil {
+	if leaf := certLeaf(cert); leaf != nil && !collapsed {
 		if ariCertID, err := certificate.MakeARICertID(leaf); err == nil {
 			replaces = ariCertID
 		}

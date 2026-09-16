@@ -1,0 +1,20 @@
+go.mod
+  s_c7b56bcc0ce69d::t_6021723d435a70 29,57-58,73-75,82-83
+  s_c7b56bcc0ce69d::t_26bc5f7816b69c 18-19,76,79,81,84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7d2d7439e7f15dda3a8f94d4440517da1e07615e",
+  "prompts": {},
+  "sessions": {
+    "s_c7b56bcc0ce69d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72239f25-6e54-44d7-8d4b-c03bff598f59",
+        "model": "claude-opus-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}

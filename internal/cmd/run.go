@@ -168,8 +168,8 @@ func (c *runCommand) run(cmd *cobra.Command, args []string) error {
 
 		dynamicDomains = server.NewDynamicDomainManager(server.DynamicDomainConfig{
 			StatePath:            globalConfig.DynamicDomainsStatePath(),
-			RefreshToken:         os.Getenv("KAMAL_PROXY_REFRESH_TOKEN"),
-			SourceToken:          os.Getenv("KAMAL_PROXY_DOMAINS_TOKEN"),
+			RefreshToken:         tokenFromEnv("REFRESH_TOKEN"),
+			SourceToken:          tokenFromEnv("DOMAINS_TOKEN"),
 			ReleaseProbeInterval: globalConfig.ACMEReleaseProbeInterval,
 		}, manager, router)
 
@@ -180,8 +180,8 @@ func (c *runCommand) run(cmd *cobra.Command, args []string) error {
 	// useful on a plain HTTP proxy too.
 	dynamicRedirects := server.NewDynamicRedirectManager(server.DynamicRedirectConfig{
 		StatePath:    globalConfig.DynamicRedirectsStatePath(),
-		RefreshToken: os.Getenv("KAMAL_PROXY_REFRESH_TOKEN"),
-		SourceToken:  os.Getenv("KAMAL_PROXY_REDIRECTS_TOKEN"),
+		RefreshToken: tokenFromEnv("REFRESH_TOKEN"),
+		SourceToken:  tokenFromEnv("REDIRECTS_TOKEN"),
 	}, router)
 	router.SetDynamicRedirectManager(dynamicRedirects)
 	defer dynamicRedirects.Stop()

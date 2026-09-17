@@ -85,7 +85,7 @@ Use this structure for the issue body or markdown file. Every section is load-be
 - (if touching cert managers or the request path) `make docker && docker run --rm kamal-proxy kamal-proxy -h` — image smoke test
 
 ## Out of scope
-<Explicit boundaries — the adjacent things an eager executor must NOT do. Always include: no edits to Dockerfile/Makefile/script/release (upstream's), no renaming kamal-proxy module/binary/RPC/socket, no touching main.>
+<Explicit boundaries — the adjacent things an eager executor must NOT do. Always include: no edits to Dockerfile/Makefile/bin/release unless the plan is about release plumbing, no renaming kamal-proxy module/binary/RPC/socket, no touching main.>
 
 ## Execution
 Implement on a branch rooted off `main` (or the relevant feature branch — `san-certificate-batching` / `wildcard-certs` — if this extends fork-only cert work), PR against `main`.

@@ -73,17 +73,28 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3
 
 Release tags are **four-segment**, `vX.Y.Z.N` (e.g. `v1.0.0.0`).
 
-The shape is unchanged from when this was a fork; the meaning is not. The first three segments used to be whatever basecamp had tagged, with `N` counting fork-only releases on top. We own dash-proxy now, so all four are ours to choose and the number reflects what shipped here. `script/release-dash` also accepts plain `vX.Y.Z`, so nobody is blocked by the distinction.
+The shape is unchanged from when this was a fork; the meaning is not. The first three segments used to be whatever basecamp had tagged, with `N` counting fork-only releases on top. We own dash-proxy now, so all four are ours to choose and the number reflects what shipped here. `bin/release` also accepts plain `vX.Y.Z`, so nobody is blocked by the distinction.
 
 Never use suffix forms like `v1.0.0-rc1`: the gem compares the image tag with `Gem::Version`, which reads a hyphen suffix as a prerelease sorting *below* the release it names — a tag that sorts below itself fails the `MINIMUM_VERSION` check.
 
 ```bash
 git checkout main
-script/release-dash v1.0.0.0     # validates tag grammar, runs make test, tags, pushes
+bin/release                 # v1.1.0.2 -> v1.1.0.3: the routine bump
+bin/release patch           # v1.1.0.2 -> v1.1.1.0
+bin/release minor           # v1.1.0.2 -> v1.2.0.0
+bin/release major           # v1.1.0.2 -> v2.0.0.0
+bin/release v1.2.0.0        # explicit tag
+bin/release --dry-run       # show the plan, publish nothing
+bin/release list            # current version, next versions, tags with no release
+bin/release backfill        # create GitHub Releases for tags that never got one
 ```
 
+There is no version file to bump — the image tag IS the version, so the newest `v*` tag is the
+source of truth and `bin/release` reads it. Every release gets a GitHub Release with notes
+generated from the PRs merged since the previous tag.
+
 - **NEVER** `git push --tags` — single-tag pushes only, `git push origin tag v1.0.0.0`
-- **NEVER** hand-craft the tag — let `script/release-dash` validate the grammar and run the tests first
+- **NEVER** hand-craft the tag — let `bin/release` validate the grammar and run the tests first
 - Release the proxy image **before** the gem — the `dash` gem's `MINIMUM_VERSION` must name an already-published `ghcr.io/zoolutions/dash-proxy` tag. See `../kamal/CLAUDE.md` for gem-side ordering.
 
 There is no upstream sync anymore — `.claude/rules/upstream-sync.md` is a historical note.

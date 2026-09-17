@@ -117,7 +117,7 @@ Write the MINIMUM code to make the test pass. Follow project patterns:
 | Add a knob only to `ServiceOptions` and forget the flag | Wire flag (`internal/cmd/deploy.go` or `run.go`) → arg struct (`commands.go`) → `ServiceOptions`/`TargetOptions`/`DeploymentOptions` |
 | Skip JSON round-trip for new persisted fields | Update `MarshalJSON`/`UnmarshalJSON` and default old state files safely |
 | Ignore the streaming/SSE bypass when touching response middleware | Check `response_buffer_middleware.go:86` bypass logic first |
-| Edit `Dockerfile`, `Makefile`, or `script/release*` casually | These stay upstream's on `main`; fork-only changes belong on `dash`/feature branches per `.claude/rules/upstream-sync.md` |
+| Edit `Dockerfile`, `Makefile`, or `bin/release` casually | Release plumbing is load-bearing: `bin/release`'s tag grammar and `docker-publish.yml`'s tag filter must stay in step |
 
 ### 4.3: Refactor
 
@@ -301,7 +301,7 @@ Not part of the default flow — only after a PR is merged to `dash` and a relea
 
 ```bash
 git checkout dash
-script/release-dash v1.0.0.0     # validates vX.Y.Z.N grammar, runs make test, tags, pushes the tag
+bin/release                      # works out the next vX.Y.Z.N, tests, tags, pushes, publishes the release
 # CI publishes ghcr.io/zoolutions/dash-proxy:v1.0.0.0 (+ :latest)
 docker buildx imagetools inspect ghcr.io/zoolutions/dash-proxy:v1.0.0.0   # verify amd64+arm64
 ```

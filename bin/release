@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# Cut a dash-proxy release. Works out the next tag, shows what is about to
+# ship, runs the suite, pushes the tag CI builds the image from, and publishes
+# a GitHub Release with generated notes.
+#
+#   bin/release             # build bump   (v1.1.0.2 -> v1.1.0.3)
+#   bin/release patch       # v1.1.0.2 -> v1.1.1.0
+#   bin/release minor       # v1.1.0.2 -> v1.2.0.0
+#   bin/release major       # v1.1.0.2 -> v2.0.0.0
+#   bin/release v1.2.0.0    # explicit tag (v-prefix optional)
+#   bin/release list        # last releases, what each bump gives, tags with no release
+#   bin/release backfill    # create GitHub Releases for tags that never got one
+#   bin/release --dry-run   # (-n) show the plan, publish nothing
+#   bin/release --force     # (-f) re-create an existing tag and release
+#
+# There is no version file: the image tag IS the version. The dash gem
+# docker-inspects the running container and compares the tag with Gem::Version,
+# so the newest v* tag is the source of truth here and suffix tags like
+# v1.0.0-rc1 are refused -- Gem::Version reads a hyphen suffix as a prerelease
+# sorting BELOW the release it names, and a tag that sorts below itself fails
+# the gem's MINIMUM_VERSION check.
+#
+# Tags are four-segment vX.Y.Z.N; plain vX.Y.Z is accepted too. Keep that
+# grammar in step with docker-publish.yml's tag filter -- a tag the filter does
+# not match pushes silently and never builds an image.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# The repository moved to zoolutions/dash-proxy; the old name still redirects
+# for git, but gh resolves the remote to the redirect source, so every gh call
+# names the repo explicitly.
+REPO="${DASH_PROXY_REPO:-zoolutions/dash-proxy}"
+
+BUMP="build"
+DRY_RUN=false
+FORCE=false
+MODE="release"
+EXPLICIT=""
+
+for arg in "$@"; do
+  case "$arg" in
+    major|minor|patch|build) BUMP="$arg" ;;
+    list|--list|-l) MODE="list" ;;
+    backfill) MODE="backfill" ;;
+    v[0-9]*|[0-9]*.[0-9]*) EXPLICIT="${arg#v}" ;;
+    --dry-run|-n) DRY_RUN=true ;;
+    --force|-f) FORCE=true ;;
+    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $arg (try --help)" >&2; exit 1 ;;
+  esac
+done
+
+# Tags may have been cut from another machine. Never let a fetch failure stop a
+# read-only run -- and a repository with no origin at all is a valid place to
+# ask what the next version would be.
+if git remote get-url origin >/dev/null 2>&1; then
+  git fetch -q origin --tags || echo "warning: could not fetch origin; working from local tags" >&2
+fi
+
+# Version-sorted, oldest first. git's version sort splits on non-digits, so it
+# orders four-segment tags correctly.
+mapfile -t TAGS < <(git tag --list 'v[0-9]*' --sort=v:refname)
+LAST_TAG=""
+if [ "${#TAGS[@]}" -gt 0 ]; then
+  LAST_TAG="${TAGS[${#TAGS[@]} - 1]}"
+fi
+
+validate_tag() {
+  local tag="$1"
+
+  if [[ "$tag" == *-* ]]; then
+    echo "error: $tag has a prerelease suffix; Gem::Version sorts it BELOW the release it names, which fails the dash gem's MINIMUM_VERSION check" >&2
+    exit 1
+  fi
+
+  if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    echo "error: $tag is not a release tag; use vX.Y.Z.N (e.g. v1.1.0.3) or plain vX.Y.Z" >&2
+    exit 1
+  fi
+}
+
+next_version() {
+  local major minor patch build
+  IFS=. read -r major minor patch build <<< "${LAST_TAG#v}"
+  build=${build:-0}
+
+  case "$1" in
+    major) echo "v$((major + 1)).0.0.0" ;;
+    minor) echo "v${major}.$((minor + 1)).0.0" ;;
+    patch) echo "v${major}.${minor}.$((patch + 1)).0" ;;
+    build) echo "v${major}.${minor}.${patch}.$((build + 1))" ;;
+  esac
+}
+
+released_tags() {
+  gh release list --repo "$REPO" --limit 200 --json tagName --jq '.[].tagName' 2>/dev/null || true
+}
+
+# Tags with no GitHub Release, oldest first.
+missing_releases() {
+  [ "${#TAGS[@]}" -eq 0 ] && return 0
+
+  local released
+  released="$(released_tags)"
+
+  local tag
+  for tag in "${TAGS[@]}"; do
+    grep -qxF "$tag" <<< "$released" || echo "$tag"
+  done
+}
+
+if [ "$MODE" = "backfill" ]; then
+  mapfile -t MISSING < <(missing_releases)
+
+  if [ "${#MISSING[@]}" -eq 0 ]; then
+    echo "every tag already has a release on $REPO"
+    exit 0
+  fi
+
+  echo "missing releases on $REPO: ${MISSING[*]}"
+
+  for tag in "${MISSING[@]}"; do
+    # Notes start at the tag before this one in version order, whether or not
+    # that tag has a release of its own -- otherwise a backfilled release
+    # repeats every commit since the last tag that happened to get published.
+    prev=""
+    for i in "${!TAGS[@]}"; do
+      if [ "${TAGS[i]}" = "$tag" ] && [ "$i" -gt 0 ]; then
+        prev="${TAGS[i - 1]}"
+      fi
+    done
+
+    latest=false
+    [ "$tag" = "$LAST_TAG" ] && latest=true
+
+    if $DRY_RUN; then
+      echo "  would create $tag  notes from ${prev:-repository start}  (latest=$latest)"
+      continue
+    fi
+
+    echo "  creating $tag (latest=$latest)"
+    gh release create "$tag" --repo "$REPO" --title "$tag" --verify-tag \
+      --generate-notes ${prev:+--notes-start-tag "$prev"} --latest="$latest"
+  done
+
+  $DRY_RUN && echo "dry run — nothing published"
+  exit 0
+fi
+
+if [ "$MODE" = "list" ]; then
+  echo "current version: ${LAST_TAG:-none}"
+  echo "image:           ghcr.io/zoolutions/dash-proxy:${LAST_TAG:-none}"
+  echo
+  echo "last releases:"
+  git for-each-ref --sort=-v:refname --count=5 \
+    --format='  %(refname:short)  %(creatordate:short)' 'refs/tags/v[0-9]*'
+  echo
+
+  if [ -n "$LAST_TAG" ]; then
+    echo "next version:"
+    printf '  %-8s%s\n' build "$(next_version build)" patch "$(next_version patch)" \
+      minor "$(next_version minor)" major "$(next_version major)"
+    echo
+  fi
+
+  mapfile -t MISSING < <(missing_releases)
+  if [ "${#MISSING[@]}" -eq 0 ]; then
+    echo "every tag already has a release on $REPO"
+  else
+    echo "tags with no release (run: bin/release backfill):"
+    printf '  %s\n' "${MISSING[@]}"
+  fi
+  exit 0
+fi
+
+if [ -n "$EXPLICIT" ]; then
+  TAG="v$EXPLICIT"; HOW="explicit"
+elif [ -z "$LAST_TAG" ]; then
+  echo "error: no v* tag to bump from; pass an explicit version (e.g. bin/release v1.0.0.0)" >&2
+  exit 1
+else
+  TAG="$(next_version "$BUMP")"; HOW="$BUMP"
+fi
+
+validate_tag "$TAG"
+
+if ! $FORCE && git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  echo "error: tag $TAG already exists (pass --force to re-create it)" >&2
+  exit 1
+fi
+
+SHA="$(git rev-parse HEAD)"
+
+echo "current:  ${LAST_TAG:-none}"
+echo "release:  $TAG  ($HOW)"
+echo "image:    ghcr.io/zoolutions/dash-proxy:$TAG  (built by CI from the tag push)"
+echo "target:   $(git branch --show-current) @ ${SHA:0:8}"
+echo
+echo "changes since ${LAST_TAG:-repository start}:"
+git log --oneline --no-decorate "${LAST_TAG:+$LAST_TAG..}HEAD" | sed 's/^/  /'
+echo
+
+if $DRY_RUN; then
+  echo "dry run — nothing tagged or published"
+  exit 0
+fi
+
+# The tag is what CI builds the image from, so it has to name a commit that is
+# already on origin/main -- a tag on an unpushed commit publishes an image no
+# one can reproduce.
+[ "$(git branch --show-current)" = "main" ] || { echo "run bin/release from main (on $(git branch --show-current))" >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "working tree has uncommitted changes; commit or stash first" >&2; exit 1; }
+[ "$SHA" = "$(git rev-parse origin/main)" ] || { echo "local main (${SHA:0:8}) != origin/main; run: git pull --ff-only origin main" >&2; exit 1; }
+
+read -r -p "tag $TAG, push it, and publish the GitHub Release? [y/N] " answer
+[[ "$answer" =~ ^[Yy]$ ]] || { echo "aborted"; exit 1; }
+
+echo
+echo "→ gofmt"
+fmt_offenders="$(gofmt -l internal/ cmd/)"
+[ -z "$fmt_offenders" ] || { echo "unformatted files (CI enforces this):" >&2; echo "$fmt_offenders" >&2; exit 1; }
+
+echo "→ make test"
+make test
+
+if $FORCE; then
+  gh release delete "$TAG" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
+  git tag -d "$TAG" 2>/dev/null || true
+fi
+
+echo "→ tagging $TAG"
+git tag -a "$TAG" -m "dash-proxy $TAG"
+git push origin tag "$TAG"
+
+echo "→ publishing the GitHub Release"
+gh release create "$TAG" --repo "$REPO" --title "$TAG" --verify-tag \
+  --generate-notes ${LAST_TAG:+--notes-start-tag "$LAST_TAG"} --latest
+
+echo
+echo "Released $TAG. CI is building ghcr.io/zoolutions/dash-proxy:$TAG"
+echo "  watch:  gh run watch --repo $REPO"
+echo "  verify: docker buildx imagetools inspect ghcr.io/zoolutions/dash-proxy:$TAG"
+echo "  then:   bump MINIMUM_VERSION in ../kamal to $TAG"

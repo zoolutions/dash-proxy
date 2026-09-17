@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
 	"net/rpc"
 	"os"
@@ -10,7 +11,20 @@ import (
 
 const (
 	ENV_PREFIX = "KAMAL_PROXY_"
+
+	// The name the proxy has carried since the rename (#122). ENV_PREFIX stays
+	// for the flag-override mechanism and for deploy tooling that predates it.
+	CURRENT_ENV_PREFIX = "DASH_PROXY_"
 )
+
+// tokenFromEnv reads a bearer token the dynamic-source pollers and the refresh
+// nudge authenticate with. DASH_PROXY_<name> wins; KAMAL_PROXY_<name> is the
+// fallback, the same way Config.SocketPath treats the socket override, so a
+// deploy tool that still sets the old name keeps working while one that has
+// moved to the new name gets it honoured.
+func tokenFromEnv(name string) string {
+	return cmp.Or(os.Getenv(CURRENT_ENV_PREFIX+name), os.Getenv(ENV_PREFIX+name))
+}
 
 // ensureDataDir creates the --data-dir when one was supplied, so state and
 // certificate files can be written into it on first use. Shared by every

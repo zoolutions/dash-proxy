@@ -1060,8 +1060,9 @@ Wildcard entries (`*.example.com`) are skipped — the proxy decides on its own
 when a zone's names are better served by a wildcard, see [Wildcards for
 dynamic domains](#wildcards-for-dynamic-domains) — invalid hostnames are
 skipped, and payloads over 1MB or 10,000 entries are rejected.
-Set `KAMAL_PROXY_DOMAINS_TOKEN` to send `Authorization: Bearer <token>` with
-each poll.
+Set `DASH_PROXY_DOMAINS_TOKEN` to send `Authorization: Bearer <token>` with
+each poll. (`KAMAL_PROXY_DOMAINS_TOKEN` is still read as a fallback, as are
+the `KAMAL_PROXY_` forms of the other two tokens below.)
 
 A service with a domain source must be the catch-all: deploy it without
 `--host` (dynamic domains route through the host-less binding, so `--tls` no
@@ -1069,11 +1070,11 @@ longer requires one). The fetched list is a hard allowlist — TLS handshakes
 for unknown hostnames are refused without touching Let's Encrypt.
 
 **Push refresh (optional).** To pick up new domains faster than the poll
-interval, set `KAMAL_PROXY_REFRESH_TOKEN` on the proxy and have the app nudge
+interval, set `DASH_PROXY_REFRESH_TOKEN` on the proxy and have the app nudge
 it after changing domains:
 
 ```bash
-curl -X POST -H "Authorization: Bearer $KAMAL_PROXY_REFRESH_TOKEN" \
+curl -X POST -H "Authorization: Bearer $DASH_PROXY_REFRESH_TOKEN" \
   http://proxy-host/.kamal-proxy/domains/refresh
 ```
 

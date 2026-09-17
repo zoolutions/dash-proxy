@@ -91,7 +91,7 @@ Note `git rerere` is enabled: previously-seen conflicts auto-replay their resolu
 3. Resolve every conflicted file **semantically** — read both sides and produce the version that preserves BOTH changes' intent. Never blanket `--ours`/`--theirs` a source file. Repo-specific rules (the authoritative playbook is `.claude/rules/upstream-sync.md`):
    - **`go.mod` / `go.sum`**: never hand-merge `go.sum`. Resolve `go.mod` semantically (union of requires; take the incoming (merged-in) branch's toolchain + dep versions — main's on a main-forward merge — keep `go-acme/lego/v4`), then run `go mod tidy` to regenerate `go.sum`.
    - **The cert overlap zone** (`internal/cmd/run.go`, `internal/server/config.go`, `internal/server/router.go`, `internal/server/service.go`): follow the union rules in `.claude/rules/upstream-sync.md`'s conflict playbook — e.g. register `--acme-email`/`--acme-directory` ONCE (pflag panics on duplicates), keep both cert init blocks, keep both `sanCertManager` and `certRegistry`.
-   - **`Dockerfile`, `Makefile`, `script/release`**: always upstream's/the base's — the fork never edits them.
+   - **`Dockerfile`, `Makefile`, `bin/release`**: take the base's, unless the PR is itself about release plumbing.
    - **`.github/workflows/*.yml`**: preserve the SHA-pinned-action-with-version-comment pattern (e.g. `actions/checkout@34e11487… # v4.3.1`) — actionlint/zizmor gate these in CI.
 4. Run the verification gates BEFORE pushing the merge:
    ```bash
@@ -142,7 +142,7 @@ Once Phase A's exit criteria are met, invoke `/github-review-comments` with the 
 The slash command is at `.claude/commands/github-review-comments.md`. Its workflow:
 
 1. Fetch all unresolved review threads via the GitHub GraphQL API (`repo: kamal-proxy`, `owner: mhenrixon`).
-2. Read and categorise each comment (valid fix / invalid suggestion / unclear) against `CLAUDE.md` Critical Rules and the architecture layers — a suggestion to rename `kamal-proxy`, edit `Dockerfile`/`Makefile`/`script/release-dash`, or commit to `main` is an automatic reject, not a judgment call.
+2. Read and categorise each comment (valid fix / invalid suggestion / unclear) against `CLAUDE.md` Critical Rules and the architecture layers — a suggestion to rename `kamal-proxy`, edit `Dockerfile`/`Makefile`/`bin/release`, or commit to `main` is an automatic reject, not a judgment call.
 3. Implement accepted fixes; verify locally (`make test`, `gofmt -l internal/ cmd/`).
 4. Commit all fixes together with a clear conventional-commit message; push.
 5. Reply to every thread with the commit SHA (for accepted fixes) or technical reasoning (for rejections).

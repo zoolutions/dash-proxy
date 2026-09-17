@@ -50,7 +50,7 @@ Point Explore agents at the actual layers, not the whole tree:
 Use direct tools when:
 - Reading a specific known file path (e.g. `internal/server/router.go`)
 - Single-file edits
-- Running `make build`, `make test`, `make docker`, or `script/release-dash`
+- Running `make build`, `make test`, `make docker`, or `bin/release`
 - Checking `gofmt -l` output before a commit
 
 ## Verification After Agent Work
@@ -66,4 +66,4 @@ gofmt -l internal/ cmd/  # must be empty — CI enforces, golangci-lint isn't in
 
 ## Release & Cross-Repo Agents
 
-Release ordering is a hard constraint (proxy image before gem `MINIMUM_VERSION` bump) — never delegate `script/release-dash` or tag pushes to an agent unsupervised. See `.claude/rules/upstream-sync.md` for the sync/release runbook and `../kamal/CLAUDE.md` for the gem-side contract.
+Release ordering is a hard constraint (proxy image before gem `MINIMUM_VERSION` bump) — never delegate `bin/release` or tag pushes to an agent unsupervised. See `.claude/rules/upstream-sync.md` for the sync/release runbook and `../kamal/CLAUDE.md` for the gem-side contract.

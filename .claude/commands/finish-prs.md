@@ -76,7 +76,7 @@ cd <worktree>
 git merge origin/dash
 ```
 
-**Merge, never rebase.** If the merge conflicts, do NOT resolve it here — `/github-review-pr` Phase A0 owns conflict resolution and carries the per-file playbook (`go.mod`/`go.sum` → main's toolchain + deps, keep `go-acme/lego/v4`, then `go mod tidy`; `internal/cmd/run.go` → union of flags but register `--acme-email`/`--acme-directory` exactly once, since pflag panics on duplicates; `internal/server/config.go`, `router.go` → union of both cert subsystems' fields and methods; `internal/server/service.go` → read both sides, preserve upstream changes AND feature wiring; `Dockerfile`/`Makefile`/`script/release` → always upstream's). Abort the merge (`git merge --abort`) and let step 2d handle it — Phase A0 runs first inside that command by design.
+**Merge, never rebase.** If the merge conflicts, do NOT resolve it here — `/github-review-pr` Phase A0 owns conflict resolution and carries the per-file playbook (`go.mod`/`go.sum` → main's toolchain + deps, keep `go-acme/lego/v4`, then `go mod tidy`; `internal/cmd/run.go` → union of flags but register `--acme-email`/`--acme-directory` exactly once, since pflag panics on duplicates; `internal/server/config.go`, `router.go` → union of both cert subsystems' fields and methods; `internal/server/service.go` → read both sides, preserve upstream changes AND feature wiring; `Dockerfile`/`Makefile`/`bin/release` → always the base's). Abort the merge (`git merge --abort`) and let step 2d handle it — Phase A0 runs first inside that command by design.
 
 If the merge is clean, commit it (git's default merge message is fine) and continue.
 
@@ -180,7 +180,7 @@ Then:
 - **Never touch `main`** — not a commit, not a merge, not a push. It is a fast-forward-only mirror of `basecamp/kamal-proxy`.
 - **Never process a PR based on `main`** — report it as a fork-model mistake instead.
 - **Never resolve conflicts here** — abort and let `/github-review-pr` Phase A0 do it with the full playbook.
-- **Prefer leaving `Dockerfile`, `Makefile`, and `script/release` as basecamp has them** — fewer conflicts when merging their fixes forward; the fork owns `script/release-dash`.
+- **Prefer taking the base's `Dockerfile`, `Makefile`, and `bin/release`** — release plumbing changes on its own PR, not as a merge side effect.
 - **Never rename the module, binary, RPC methods, or socket path** away from `kamal-proxy`.
 - **Don't re-implement `/github-review-pr`, `/github-review-failures`, or `/github-review-comments`** — invoke them.
 - **One stuck PR must not block the rest** — mark it `needs-user`, continue the queue, return to it in the final report.

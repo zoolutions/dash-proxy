@@ -10,7 +10,7 @@ on:
   push:
     # Release tags are four-segment vX.Y.Z.N; plain vX.Y.Z publishes too, so a
     # tag is never pushed that silently fails to build. Keep the shapes here in
-    # step with script/release-dash.
+    # step with bin/release.
     tags: [ "v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+.[0-9]+" ]
 
 permissions: {}

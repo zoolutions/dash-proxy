@@ -23,9 +23,9 @@ Review PR for fork-rule compliance, Go idioms, and pattern issues. Be concise.
 | Check | Violation = blocker |
 |---|---|
 | Base branch | Targets `main` instead of `dash` |
-| Tag grammar (if PR touches release scripts/CI) | `script/release-dash` and `docker-publish.yml`'s tag filter drifting apart — a tag that pushes but never builds |
+| Tag grammar (if PR touches release scripts/CI) | `bin/release` and `docker-publish.yml`'s tag filter drifting apart — a tag that pushes but never builds |
 | `kamal-proxy` naming | Renames the module, binary, RPC service name, or socket path |
-| Upstream-owned files | Edits `Dockerfile`, `Makefile`, or `script/release` outside a sync merge (`.claude/rules/upstream-sync.md` says these are always upstream's) |
+| Release plumbing | Edits to `bin/release` or `docker-publish.yml` that move the tag grammar on one side only |
 | OCI label | Touches `docker-publish.yml` without preserving `org.opencontainers.image.title=kamal-proxy` |
 | `:latest` deploys | Adds any path that resolves/deploys against `:latest` instead of a numeric tag |
 | `go mod tidy` hygiene | `go.mod`/`go.sum` diff drops `go-acme/lego/v4` or looks hand-edited instead of tidy output |
@@ -66,7 +66,7 @@ Direct target dial bypassing LoadBalancer    -> route through LoadBalancer.Start
 
 - [ ] Targets `dash`, not `main`
 - [ ] No `kamal-proxy` renames (module/binary/RPC/socket)
-- [ ] No edits to Dockerfile/Makefile/script/release outside a sync merge
+- [ ] `bin/release` and `docker-publish.yml` still agree on the tag grammar
 - [ ] Tag/version references are four-segment `vX.Y.Z.N` if touched
 - [ ] `go mod tidy` clean, `go-acme/lego/v4` intact
 

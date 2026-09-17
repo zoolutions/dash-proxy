@@ -167,7 +167,7 @@ No coverage tool is wired into CI (`ci.yml` runs build + test + golangci-lint + 
 - Ignore failing tests
 - Test implementation details — test behavior (RPC response, HTTP status, routing decision)
 - Skip testing error paths (`RegisterDomain` when registry isn't ready, RPC dial failure, cert renewal failure)
-- Touch `Dockerfile`, `Makefile`, or `script/release*` to make a test pass — those stay upstream's, per `.claude/rules/upstream-sync.md`
+- Touch `Dockerfile`, `Makefile`, or `bin/release` to make a test pass — release plumbing changes on its own merit, not to turn a test green
 
 ## Checklist
 

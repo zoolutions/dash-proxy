@@ -23,7 +23,7 @@
 ### Always Do
 
 1. **Four-segment tags** `vX.Y.Z.N` (e.g. `v1.0.0.0`) — the shape is unchanged, the meaning is not: all four segments are ours to choose. They used to be `<upstream-base>.<counter>`, derived from whatever basecamp had tagged; we own dash-proxy now, so the number reflects what shipped here
-2. **Release via `script/release-dash`** — validates the tag grammar, tests, tags, pushes; CI builds and publishes. Its grammar and `docker-publish.yml`'s tag filter must stay in step, or a tag pushes and nothing builds
+2. **Release via `bin/release`** — works out the next tag, validates the grammar, runs `gofmt`/`make test`, tags, pushes, and publishes the GitHub Release with generated notes; CI builds and publishes the image. Its grammar and `docker-publish.yml`'s tag filter must stay in step, or a tag pushes and nothing builds
 3. **`go mod tidy` after merging main into cert branches** — take main's dep graph, keep lego
 4. **`make test` + `gofmt -l` clean before pushing** — CI enforces formatting
 
@@ -33,7 +33,10 @@
 make build                                  # Build bin/kamal-proxy
 make test                                   # go test ./...
 make docker                                 # Local image build (smoke test)
-script/release-dash v1.0.0.0                # Tag + push; CI publishes to ghcr
+bin/release                                 # Bump the 4th segment, tag, push, publish the release
+bin/release minor --dry-run                 # Show the plan for any bump, publish nothing
+bin/release list                            # Current version, next versions, tags with no release
+bin/release backfill                        # Create GitHub Releases for tags that never got one
 docker buildx imagetools inspect ghcr.io/zoolutions/dash-proxy:v1.0.0.0   # Verify multi-arch
 ```
 

@@ -18,7 +18,7 @@ Review PR for fork-rule compliance, Go idioms, and pattern issues. Be concise.
 5. Run local verification (`make build`, `make test`, `gofmt -l`)
 6. Output structured review
 
-## Fork Rules (from CLAUDE.md — check every PR)
+## Fork Rules (from AGENTS.md — check every PR)
 
 | Check | Violation = blocker |
 |---|---|
@@ -97,6 +97,6 @@ make lint                -> golangci-lint (install the version ci.yml pins; run 
 
 ## Cross-References
 
-- `CLAUDE.md` — Critical Rules, architecture layers, branch map
+- `AGENTS.md` — Critical Rules, architecture layers, branch map
 - `.claude/rules/upstream-sync.md` — conflict playbook, release procedure
 - `ROADMAP.md` — check whether the PR maps to a listed roadmap item or is unplanned scope

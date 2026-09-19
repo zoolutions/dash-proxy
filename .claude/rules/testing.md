@@ -92,7 +92,7 @@ Reuse the package's existing test helpers instead of hand-rolling servers — `t
 - [ ] No skipped tests without a reason
 - [ ] Edge cases covered (empty target list, illegal host patterns, unhealthy targets, expired/missing certs)
 - [ ] Error paths tested (ACME failures, RPC dial failures, invalid TLS host config)
-- [ ] New fork-only code (SAN batching, wildcard certs) has its own tests — it has no upstream test suite backing it up; see `CLAUDE.md` Never-Do #1 on why `kamal-proxy` naming can't drift
+- [ ] New fork-only code (SAN batching, wildcard certs) has its own tests — it has no upstream test suite backing it up; see `AGENTS.md` Never-Do #1 on why `kamal-proxy` naming can't drift
 
 ## Commands
 
@@ -105,6 +105,6 @@ make docker && docker run --rm kamal-proxy kamal-proxy -h   # image smoke test
 
 ## Cross-References
 
-- `CLAUDE.md` — architecture layers, branch map, release ordering
+- `AGENTS.md` — architecture layers, branch map, release ordering
 - `.claude/rules/upstream-sync.md` — merge conflict playbook for `router.go`/`config.go`/`service.go` during sync; test after every merge, not just before push
 - `ROADMAP.md` — planned fork features that will need their own test coverage before merging to `dash`

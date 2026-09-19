@@ -179,4 +179,4 @@ No coverage tool is wired into CI (`ci.yml` runs build + test + golangci-lint + 
 - [ ] `make test` passes full suite
 - [ ] Edge cases and error paths covered
 - [ ] RPC contract changes verified against `../kamal` integration tests if `internal/cmd` or `internal/server/commands.go` touched
-- [ ] `kamal-proxy` binary/RPC/socket naming untouched (see `CLAUDE.md` Critical Rules)
+- [ ] `kamal-proxy` binary/RPC/socket naming untouched (see `AGENTS.md` Critical Rules)

@@ -43,7 +43,7 @@ Point Explore agents at the actual layers, not the whole tree:
 | RPC server + core | `internal/server` | `router.go`, `service.go`, `load_balancer.go`, `target.go` — request path |
 | Cert managers | `internal/server` | `san_cert_manager.go` + `san_cert_issuance.go` + `san_cert_dynamic.go` (the single cert system: SAN batching, HTTP-01 and DNS-01, allowlist, rate limit), `acme/` (DNS-01 providers), `domain_issuer.go` / `domain_renewal.go` (async issuance and renewal) |
 | Middleware | `internal/server` | `*_middleware.go` — logging, buffering, error pages, request id |
-| Docs | repo root | `CLAUDE.md`, `ROADMAP.md`, `.claude/rules/upstream-sync.md` |
+| Docs | repo root | `AGENTS.md`, `ROADMAP.md`, `.claude/rules/upstream-sync.md` |
 
 ## When NOT to Use Agents
 

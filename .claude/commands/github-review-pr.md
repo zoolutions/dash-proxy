@@ -29,7 +29,7 @@ Conflicts-first, then failures-first eliminates this confusion. CI is either gre
 
 This is a maintained fork, not a normal repo. Before either phase, ground yourself in:
 
-- `CLAUDE.md` — Critical Rules: `kamal-proxy` module/binary/RPC/socket naming is load-bearing, `main` is fast-forward-only (never commit to it), tags are four-segment `vX.Y.Z.N`, no `git push --tags`.
+- `AGENTS.md` — Critical Rules: `kamal-proxy` module/binary/RPC/socket naming is load-bearing, `main` is fast-forward-only (never commit to it), tags are four-segment `vX.Y.Z.N`, no `git push --tags`.
 - `.claude/rules/git-workflow.md` — commit message format, branch model, pre-commit checklist.
 - `.claude/rules/upstream-sync.md` — merge conflict playbook if the PR touches `internal/cmd/run.go`, `internal/server/config.go`, `internal/server/router.go`, or `internal/server/service.go` (the two cert branches' overlap zone).
 - `.claude/rules/testing.md` — 100% coverage floor for Router, LoadBalancer, SANCertManager, cert registry, RPC commands.
@@ -142,7 +142,7 @@ Once Phase A's exit criteria are met, invoke `/github-review-comments` with the 
 The slash command is at `.claude/commands/github-review-comments.md`. Its workflow:
 
 1. Fetch all unresolved review threads via the GitHub GraphQL API (`repo: kamal-proxy`, `owner: mhenrixon`).
-2. Read and categorise each comment (valid fix / invalid suggestion / unclear) against `CLAUDE.md` Critical Rules and the architecture layers — a suggestion to rename `kamal-proxy`, edit `Dockerfile`/`Makefile`/`bin/release`, or commit to `main` is an automatic reject, not a judgment call.
+2. Read and categorise each comment (valid fix / invalid suggestion / unclear) against `AGENTS.md` Critical Rules and the architecture layers — a suggestion to rename `kamal-proxy`, edit `Dockerfile`/`Makefile`/`bin/release`, or commit to `main` is an automatic reject, not a judgment call.
 3. Implement accepted fixes; verify locally (`make test`, `gofmt -l internal/ cmd/`).
 4. Commit all fixes together with a clear conventional-commit message; push.
 5. Reply to every thread with the commit SHA (for accepted fixes) or technical reasoning (for rejections).

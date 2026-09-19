@@ -32,7 +32,7 @@ Protect this session's context: delegate mechanical exploration to cheaper subag
 1. Fan out Explore agents for file discovery and call-site sweeps (e.g. "find every RPC client call site for `commands.go`"); use a general-purpose agent when a subsystem needs to be read and summarized. Launch independent explorations in parallel — see `.claude/rules/agents.md` for this repo's exploration surfaces (`internal/cmd` = CLI/RPC client, `internal/server` = router/service/load-balancer/cert managers).
 2. Read the load-bearing files yourself — the ones the design decision actually hinges on. Don't design from subagent summaries alone.
 3. Check `ROADMAP.md` first — planned work already has a code anchor (e.g. `internal/server/domain_renewal.go`, `internal/server/load_balancer.go:174`). If $ARGUMENTS matches a roadmap item, start from its anchor and evidence links instead of re-deriving them.
-4. Check the architecture layers and Critical Rules in `CLAUDE.md` — `kamal-proxy` naming is load-bearing (module/binary/RPC/socket), the branch map, and the "image tag IS the version" model constrain any design.
+4. Check the architecture layers and Critical Rules in `AGENTS.md` — `kamal-proxy` naming is load-bearing (module/binary/RPC/socket), the branch map, and the "image tag IS the version" model constrain any design.
 5. Check `git log` and `git branch -a` for recent related work on `main`, `dash`, `san-certificate-batching`, `wildcard-certs` — the design should extend it, not fight it or duplicate a branch that already carries it.
 
 ## Phase 2 — Surface the unknowns (blindspot pass + interview)
@@ -45,7 +45,7 @@ Investigation tells you what the codebase says; this phase finds what the REQUES
    - anything with no precedent in this repo or in `ROADMAP.md` — flag it explicitly as unknown-unknown territory
    - whether the feature needs a gem-side half in `../kamal`, which forces release ordering (proxy image before gem)
 2. **Interview the user** with AskUserQuestion, one question at a time, prioritized by blast radius: architecture-changing answers first, then the operator-facing surface (CLI flags, RPC args, persisted state), then ergonomics. Rules:
-   - Skip anything the codebase, `CLAUDE.md`, `ROADMAP.md`, or an existing issue already answers.
+   - Skip anything the codebase, `AGENTS.md`, `ROADMAP.md`, or an existing issue already answers.
    - 2–5 questions is the sweet spot; zero is fine when the request is genuinely unambiguous — say so rather than inventing questions.
    - Every question offers concrete options with a recommended default, never an open-ended essay prompt.
 3. **Record the answers** in the plan's Decision section as `Settled in interview:` bullets — constraints the executor must not re-litigate.

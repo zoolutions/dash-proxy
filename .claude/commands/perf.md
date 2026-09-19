@@ -15,7 +15,7 @@ any performance claim is backed by numbers.
 **Measure BEFORE you change.** A delta you didn't baseline is not a delta. If
 a change already landed without a baseline, reconstruct one from `main` in a
 **worktree** — never the primary tree, and never on `dash`. `main` is a
-fast-forward-only mirror of upstream (`CLAUDE.md`); a worktree keeps the
+fast-forward-only mirror of upstream (`AGENTS.md`); a worktree keeps the
 baseline checkout disposable and never risks a stray commit landing there.
 
 ## Workflow
@@ -66,7 +66,7 @@ branch runs to it with `-bench=$ARGUMENTS`; otherwise run the full suite
       `b.Run` subtests using `for b.Loop() { ... }`).
 - [ ] The before/after numbers are in the PR body.
 - [ ] `gofmt -l internal/ cmd/` clean before pushing — CI enforces it
-      (`CLAUDE.md` Always Do #4).
+      (`AGENTS.md` Always Do #4).
 
 ## The hot paths to watch
 
@@ -87,7 +87,7 @@ one alongside the change that touches them rather than reasoning from the
 
 There is no `rake`, no RSpec, no bundler here — this is a Go module
 (`go.mod` still declares `github.com/basecamp/kamal-proxy`; the module name
-is unrenamed on purpose, see `CLAUDE.md` Never Do #1). Everything above is
+is unrenamed on purpose, see `AGENTS.md` Never Do #1). Everything above is
 `go test -bench`. If the work in question is actually about deploy-time
 behavior (rollout speed, health-check convergence, ACME issuance latency)
 rather than a hot code path, that isn't a Go benchmark — profile the deploy

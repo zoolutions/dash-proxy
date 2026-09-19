@@ -147,7 +147,7 @@ grep -rn "system(\|`\|%x{" lib/kamal/ | grep -v spec
 | String-interpolating secrets/tags into SSH or `docker login` commands | SSHKit argument-array form |
 | Adding an `http.Server` without `ReadHeaderTimeout` | Set explicit timeouts (slowloris) |
 | Switching error pages to `text/template` | Keep `html/template` (auto-escaping) |
-| Deploying on `:latest` or a non-numeric tag | Four-segment `vX.Y.Z.N` only — the gem's version check requires it (see repo `CLAUDE.md`) |
+| Deploying on `:latest` or a non-numeric tag | Four-segment `vX.Y.Z.N` only — the gem's version check requires it (see repo `AGENTS.md`) |
 
 ## Handoff
 
@@ -156,6 +156,6 @@ When complete, summarize:
 - Remediation steps
 - Tests to add (`make test` coverage, or gem-side Minitest via `../kamal/bin/test` if the finding is on the `kamal` side)
 
-Cross-reference `CLAUDE.md` (architecture, load-bearing names), `.claude/rules/upstream-sync.md` (merge/release constraints — don't propose a fix that fights the union-merge conflict playbook), and `ROADMAP.md` before proposing structural changes.
+Cross-reference `AGENTS.md` (architecture, load-bearing names), `.claude/rules/upstream-sync.md` (merge/release constraints — don't propose a fix that fights the union-merge conflict playbook), and `ROADMAP.md` before proposing structural changes.
 
 Now, focus on security review for the current task.

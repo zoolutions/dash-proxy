@@ -8,7 +8,7 @@ only long-lived branch; everything lands there via PR.
 If a basecamp/kamal-proxy fix is ever wanted, cherry-pick it deliberately from a fresh clone
 of their repo — do not re-add an `upstream` remote or resurrect the mirror-branch model.
 
-What survives from the fork era (see `CLAUDE.md` Critical Rules):
+What survives from the fork era (see `AGENTS.md` Critical Rules):
 
 - The Go module, binary, RPC service, socket, and `org.opencontainers.image.title=kamal-proxy`
   label keep their `kamal-proxy` names until the server-artifact rename ships a migration bridge.

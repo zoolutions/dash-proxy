@@ -189,7 +189,7 @@ If you can identify that certain failures will persist for environmental reasons
 - **Read before fixing** — always read the actual failing code before attempting a fix
 - **Fix the root cause** — don't add `//nolint` to bypass lint; fix the actual issue
 - **Don't fix unrelated failures** — if a test was already failing on `dash`, note it but don't fix it in this PR
-- **Respect `CLAUDE.md`'s Never Do list** — no renaming `kamal-proxy` (module/binary/RPC/socket), no suffix tags like `v1.0.0-rc1`, and prefer leaving `Dockerfile`/`Makefile` as basecamp has them so their fixes merge cleanly (per `.claude/rules/upstream-sync.md`)
+- **Respect `AGENTS.md`'s Never Do list** — no renaming `kamal-proxy` (module/binary/RPC/socket), no suffix tags like `v1.0.0-rc1`, and prefer leaving `Dockerfile`/`Makefile` as basecamp has them so their fixes merge cleanly (per `.claude/rules/upstream-sync.md`)
 - **Flaky tests** — if a test passes locally but fails in CI, note it as potentially flaky rather than adding workarounds
 - **Don't retry CI blindly** — diagnose first, fix, then push. Each push triggers a full CI run.
 

@@ -12,7 +12,7 @@ You are reviewing and responding to all unresolved review comments on a GitHub p
 **Fork context first.** This repo is a fork of `basecamp/kamal-proxy`, not a normal project. Before evaluating anything, know:
 
 - PRs target `dash`, never `main` -- `main` is a fast-forward-only mirror of upstream and never receives commits
-- `kamal-proxy` naming (module, binary, RPC service, socket) is load-bearing -- see `CLAUDE.md` Critical Rules #1; never accept a rename suggestion
+- `kamal-proxy` naming (module, binary, RPC service, socket) is load-bearing -- see `AGENTS.md` Critical Rules #1; never accept a rename suggestion
 - Tags are four-segment `vX.Y.Z.N`, never suffix forms like `v1.0.0-rc1` -- see `.claude/rules/git-workflow.md`
 - Full sync/branch rules: `.claude/rules/upstream-sync.md`, `.claude/rules/git-workflow.md`
 
@@ -103,8 +103,8 @@ For each unresolved comment, read the full body and categorise it:
 | Valid test gap | Add the missing test (table-driven, per `.claude/rules/testing.md`) |
 | Valid style/consistency issue | Fix it |
 | Incorrect suggestion | Push back with technical reasoning |
-| Suggestion conflicts with architecture | Push back, reference `CLAUDE.md` layers (`cmd/kamal-proxy` -> `internal/cmd` -> RPC -> `internal/server`) |
-| Renames `kamal-proxy` module/binary/RPC/socket | Reject outright -- `CLAUDE.md` Critical Rules #1, load-bearing across 9 RPC client call sites and the Dockerfile |
+| Suggestion conflicts with architecture | Push back, reference `AGENTS.md` layers (`cmd/kamal-proxy` -> `internal/cmd` -> RPC -> `internal/server`) |
+| Renames `kamal-proxy` module/binary/RPC/socket | Reject outright -- `AGENTS.md` Critical Rules #1, load-bearing across 9 RPC client call sites and the Dockerfile |
 | Targets `main` or suggests committing there | Reject outright -- `main` is ff-only, see Branch Model |
 | Over-engineering / YAGNI | Push back, explain why it's unnecessary |
 | Unclear | Ask for clarification (do NOT implement) |
@@ -114,7 +114,7 @@ For each unresolved comment, read the full body and categorise it:
 2. Check if the suggestion is technically correct for THIS codebase
 3. Check if it would break existing functionality (run the relevant package's tests, not just read the diff)
 4. Check if existing patterns/conventions contradict the suggestion (`internal/server/router_test.go`, `load_balancer_test.go` helpers are the house style for tests)
-5. Check `CLAUDE.md` and `.claude/rules/*.md` -- project conventions override reviewer preferences, including fork-specific constraints (naming, branch model, tag grammar)
+5. Check `AGENTS.md` and `.claude/rules/*.md` -- project conventions override reviewer preferences, including fork-specific constraints (naming, branch model, tag grammar)
 
 ---
 
@@ -236,7 +236,7 @@ When pushing back:
 
 - Use technical reasoning grounded in the actual codebase
 - Reference existing patterns if the suggestion contradicts them (e.g. `testRouter(t)`, `testBackend(t, ...)` helpers over hand-rolled servers)
-- Reference `CLAUDE.md` / `.claude/rules/*.md` when applicable -- especially fork constraints (naming, branch model, tag grammar, release ordering)
+- Reference `AGENTS.md` / `.claude/rules/*.md` when applicable -- especially fork constraints (naming, branch model, tag grammar, release ordering)
 - Explain what would break or what edge case the reviewer missed
 - If the suggestion is valid in principle but wrong for this context, say so
 
@@ -247,8 +247,8 @@ When pushing back:
 - Always read the actual code before evaluating a comment -- reviewers sometimes misread diffs
 - If a comment reveals a genuine bug you missed, fix it without defensiveness
 - If multiple comments suggest the same change, implement it once and reference the fix in all replies
-- Bot reviewers (CodeRabbit, etc.) sometimes suggest changes that conflict with project or fork conventions -- verify against `CLAUDE.md` and `.claude/rules/*.md`, not just general Go idiom
-- Watch for suggestions that are correct for upstream `basecamp/kamal-proxy` but wrong here (e.g. "just use one cert manager") -- the fork's SAN batching and wildcard DNS-01 features are intentional divergence, see `CLAUDE.md` Branch map
+- Bot reviewers (CodeRabbit, etc.) sometimes suggest changes that conflict with project or fork conventions -- verify against `AGENTS.md` and `.claude/rules/*.md`, not just general Go idiom
+- Watch for suggestions that are correct for upstream `basecamp/kamal-proxy` but wrong here (e.g. "just use one cert manager") -- the fork's SAN batching and wildcard DNS-01 features are intentional divergence, see `AGENTS.md` Branch map
 - If a new round of review comments appears after your push (from re-review), report that to the user rather than entering an infinite loop
 
 Now begin by determining the PR number from `$ARGUMENTS` or the current branch.

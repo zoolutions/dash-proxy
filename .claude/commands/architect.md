@@ -24,7 +24,7 @@ Layer 1: internal/server         Router, Service, LoadBalancer, Target, cert man
 Layer 0: state + certs           ~/.config/kamal-proxy/*.json (Service.MarshalJSON round-trip), autocert/lego stores
 ```
 
-Reference: `CLAUDE.md` "Architecture" section for the one-line version; `ROADMAP.md` "Implementation notes" for the anchor table this mode is built from.
+Reference: `AGENTS.md` "Architecture" section for the one-line version; `ROADMAP.md` "Implementation notes" for the anchor table this mode is built from.
 
 ## Typical Implementation Flow
 
@@ -78,7 +78,7 @@ Reference: `CLAUDE.md` "Architecture" section for the one-line version; `ROADMAP
 |-------|-------|
 | Start in `internal/server` | Start with the options struct + JSON round-trip, then RPC, then server |
 | New field with no default-safety | Every persisted field must tolerate absence in old state files |
-| Rename anything `kamal-proxy` | Binary/module/RPC-name/socket are load-bearing (CLAUDE.md Never Do #1) — never touch |
+| Rename anything `kamal-proxy` | Binary/module/RPC-name/socket are load-bearing (AGENTS.md Never Do #1) — never touch |
 | Register RPC name twice | `CommandHandler` registration is `sync.Once` — extend existing methods, don't re-register |
 | Skip `gofmt` | CI enforces `gofmt -l` clean; run it before every push |
 | Forget the gem side | Anything in `deploy.yml` needs `../kamal` plumbing too (ROADMAP implementation notes) |

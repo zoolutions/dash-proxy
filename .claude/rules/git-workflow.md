@@ -104,7 +104,7 @@ There is no upstream sync anymore — `.claude/rules/upstream-sync.md` is a hist
 - **NEVER** push directly to `main` — everything lands via PR (ruleset-enforced; admin bypass is for migrations, not routine)
 - **NEVER** force push to shared branches (`main`, feature branches once pushed)
 - **NEVER** rebase a published branch — merge forward instead
-- **NEVER** rename the module/binary/RPC service/socket away from `kamal-proxy` — see `CLAUDE.md` Critical Rules
+- **NEVER** rename the module/binary/RPC service/socket away from `kamal-proxy` — see `AGENTS.md` Critical Rules
 - **ALWAYS** run `gofmt -l` + `make test` before committing
 - **ALWAYS** write meaningful commit messages, WHY over WHAT
 - Keep commits small and focused, one logical change per commit

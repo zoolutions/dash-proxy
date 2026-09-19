@@ -99,7 +99,7 @@ func (p *PauseController) GetState() PauseState {
 
 ### Naming & Package Boundaries
 
-- The module, binary, RPC service name, and unix socket are **`kamal-proxy`** — never rename in code, `go.mod`, `Dockerfile`, or CI. It's dialed from 9 client call sites in `internal/cmd` and execed by the `dash` gem; see `CLAUDE.md` Critical Rules and `.claude/rules/upstream-sync.md`
+- The module, binary, RPC service name, and unix socket are **`kamal-proxy`** — never rename in code, `go.mod`, `Dockerfile`, or CI. It's dialed from 9 client call sites in `internal/cmd` and execed by the `dash` gem; see `AGENTS.md` Critical Rules and `.claude/rules/upstream-sync.md`
 - New RPC verbs: define `<Verb>Args` in `internal/server/commands.go`, register the handler, add a matching `internal/cmd/<verb>.go` cobra command — follow `deploy.go`/`DeployArgs` as the template, not ad hoc structs elsewhere
 - Fork-only additions (SAN batching, wildcard DNS-01) stay in their own files/packages (`san_cert_manager.go`, `internal/server/acme/`) rather than being folded into upstream files like `cert.go` — keeps merge conflicts localized per `.claude/rules/upstream-sync.md`'s conflict playbook
 

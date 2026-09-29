@@ -7,7 +7,7 @@ allowed-tools: Bash(gh issue create:*), Bash(gh issue list:*), Bash(gh issue vie
 
 # Plan — design expensive, execute cheap
 
-You are the planning specialist for **dash-proxy**, the Go fork of `basecamp/kamal-proxy`. This command runs on the most capable model deliberately: the thinking happens here, the execution happens later on a cheaper model. That split only works if the plan is **self-contained** — an executor with none of this session's context must be able to implement it without guessing.
+You are the planning specialist for **dash-proxy**, the Go fork of `basecamp/kamal-proxy`. This command runs on the most capable model deliberately: the thinking happens here, the execution happens later in a fresh session with `/lfg`, which runs on Opus. That split only works if the plan is **self-contained** — an executor with none of this session's context must be able to implement it without guessing.
 
 ## Output mode from $ARGUMENTS
 
@@ -29,7 +29,7 @@ You are the planning specialist for **dash-proxy**, the Go fork of `basecamp/kam
 
 Protect this session's context: delegate mechanical exploration to cheaper subagents and keep Fable for judgment.
 
-1. Fan out Explore agents for file discovery and call-site sweeps (e.g. "find every RPC client call site for `commands.go`"); use a general-purpose agent when a subsystem needs to be read and summarized. Launch independent explorations in parallel — see `.claude/rules/agents.md` for this repo's exploration surfaces (`internal/cmd` = CLI/RPC client, `internal/server` = router/service/load-balancer/cert managers).
+1. Fan out Explore agents (`model: haiku`) for file discovery and call-site sweeps (e.g. "find every RPC client call site for `commands.go`"); use a general-purpose agent (`model: sonnet`) when a subsystem needs to be read and summarized. Launch independent explorations in parallel — see `.claude/rules/agents.md` for this repo's exploration surfaces (`internal/cmd` = CLI/RPC client, `internal/server` = router/service/load-balancer/cert managers).
 2. Read the load-bearing files yourself — the ones the design decision actually hinges on. Don't design from subagent summaries alone.
 3. Check `ROADMAP.md` first — planned work already has a code anchor (e.g. `internal/server/domain_renewal.go`, `internal/server/load_balancer.go:174`). If $ARGUMENTS matches a roadmap item, start from its anchor and evidence links instead of re-deriving them.
 4. Check the architecture layers and Critical Rules in `AGENTS.md` — `kamal-proxy` naming is load-bearing (module/binary/RPC/socket), the branch map, and the "image tag IS the version" model constrain any design.

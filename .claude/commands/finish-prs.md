@@ -1,7 +1,7 @@
 ---
 description: "Drive a set of open dash-proxy PRs to merge-ready, one at a time, in a given order. Merges the base forward (never rebases — published branches are shared), runs /github-review-pr (conflicts, then CI failures, then review comments) on each, then waits for the user to merge before syncing and advancing to the next. Use to clear a stack of stacked/parallel PRs without manual merge churn."
 model: opus
-argument-hint: "ordered PR list (e.g. '12 14 15 18'); optional 'automerge' to enable gh auto-merge; empty = auto-discover your open PRs"
+argument-hint: "ordered PR list (e.g. '12 14 15 18'); optional 'automerge' to merge each PR once every check is green (no gh auto-merge); empty = auto-discover your open PRs"
 allowed-tools: Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr diff:*), Bash(gh pr comment:*), Bash(gh pr merge:*), Bash(gh api:*), Bash(gh run view:*), Bash(git:*), Bash(make:*), Bash(go test:*), Bash(go vet:*), Bash(go mod:*), Bash(gofmt:*), Bash(cd:*), Read, Write, Edit, Glob, Grep, Agent, Skill, TaskCreate, TaskUpdate, TaskGet, TaskList, ScheduleWakeup
 ---
 
@@ -33,7 +33,7 @@ This is a fork, and its branch model changes what "sync the PR" means. Read `.cl
 `$ARGUMENTS` may be:
 
 - A space/comma-separated ordered list of PR numbers: `12 14 15 18` (also accepts `#12`, `PR12`).
-- The word `automerge` anywhere in the args → enable `gh pr merge --auto --squash` on each PR once it is green + approved (still respects branch protection; GitHub merges when gates pass). Strip it out before parsing numbers.
+- The word `automerge` anywhere in the args → merge each PR with `gh pr merge --squash` once every check is finished and green and it is approved (not `--auto`, which waits only for the required checks). Strip it out before parsing numbers.
 - Empty → auto-discover:
 
   ```bash
@@ -122,13 +122,15 @@ gh pr view <PR> --json mergeable,mergeStateStatus,reviewDecision,baseRefName \
 gh pr checks <PR>
 ```
 
-Merge-ready means: `baseRefName=dash`, `mergeable=MERGEABLE`, no failing checks (green or pending-green), and `reviewDecision` is `APPROVED` or empty (not `CHANGES_REQUESTED`). A `BLOCKED` mergeStateStatus with everything else green usually means "awaiting required approval" — expected, not a defect.
+Merge-ready means: `baseRefName=main`, `mergeable=MERGEABLE`, every check finished and green (`gh pr checks <PR> --json name,bucket`: each bucket `pass` or `skipping`, none `pending`, none `fail`; wait while any is pending), and `reviewDecision` is `APPROVED` or empty (not `CHANGES_REQUESTED`). `main` requires no approving review; a `BLOCKED` mergeStateStatus with everything else green is not a missing approval (the ruleset's `code_scanning` rule, whose CodeQL results are not configured, is the likely cause): report it `needs-user` instead of merging or polling.
 
 `mergeable=UNKNOWN` is common right after a push and can persist for minutes. Don't poll it; verify locally per the `git merge-tree --write-tree --name-only origin/dash FETCH_HEAD` recipe in `/github-review-pr` Phase A0.
 
 ### 2f. Hand off for merge
 
-- **`automerge` mode:** `gh pr merge <PR> --auto --squash` (GitHub merges when gates pass). Then go to Phase 3 to wait for the merge to land before advancing.
+Run the `fable-validator` agent on the combined diff first, with the PR body as the issue and `main` as the base. On BLOCK do not open or merge: mark it `needs-user` and report the blockers instead of calling it ready.
+
+- **`automerge` mode:** `gh pr merge <PR> --squash`, only once every check is finished and green as above, asked again right before the merge (`gh pr checks <PR> --json name,bucket`: a push while the validator ran leaves checks pending; then wait, as in 2e). Do not arm `--auto`: GitHub would merge as soon as the *required* checks pass, while a check that is not required (Gitar, cubic) may still be pending or about to fail. Then go to Phase 3 to wait for the merge to land before advancing.
 - **Default (pause) mode:** report this PR as ✅ merge-ready with its URL and a one-line "what's in it," and tell the user it's ready to merge. Then **wait** (Phase 3).
 
 Mark the PR's task `completed` (merge-ready) — or `needs-user` via a metadata note if it got stuck in 2d.

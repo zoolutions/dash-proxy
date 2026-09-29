@@ -63,7 +63,7 @@ Create a TaskCreate todo list with specific implementation steps.
 
 ## Phase 2: Explore
 
-1. Find related files (Glob/Grep or Explore agent)
+1. Find related files (Glob/Grep or Explore agent, `model: haiku`)
 2. Read existing patterns in similar features — e.g. how `ServiceOptions` (`internal/server/service.go:82`) or `TargetOptions` (`internal/server/target.go:65`) added a prior knob
 3. Understand dependencies and integration points across the three layers
 4. Check existing test coverage (`*_test.go` next to the file you're touching)
@@ -221,6 +221,12 @@ Re-read the original requirements and verify:
 
 ---
 
+## Phase 6.5: Fable validation
+
+Spawn the `fable-validator` agent (it is pinned to Fable) with the issue, the acceptance criteria from Phase 1 and the base branch. On **BLOCK**, fix every blocker (back to Phase 4 for code, with a failing test first), re-verify, and run the validator again. On **PASS WITH NOTES**, fix the risks you agree with (if those fixes change the diff, re-verify and run the validator again) and list the rest in the pull request under "Accepted risks". Put the validator's one-line verdict and its "Not verified" list in the pull request body. Do not open the pull request before a PASS or PASS WITH NOTES.
+
+---
+
 ## Phase 7: Commit & PR
 
 ### Commit
@@ -259,6 +265,12 @@ gh pr create --base main --title "feat(scope): brief description" --body "$(cat 
 - Key change 2
 
 Closes #<issue_number>
+
+## Fable validation
+<the validator's one-line verdict, and its "Not verified" list>
+
+## Accepted risks
+<risks the validator raised that were not fixed, and why; or "None">
 
 ## Test plan
 - [ ] Scenario 1
@@ -326,6 +338,7 @@ The tests prove the CODE is right; this phase keeps the USER's mental model righ
 - [ ] `gofmt -l internal/ cmd/` clean
 - [ ] `make test` passes
 - [ ] `go vet ./...` clean
+- [ ] `fable-validator` returned PASS or PASS WITH NOTES; its verdict and "Not verified" list are in the PR body
 - [ ] Backwards compatibility maintained (state files, RPC contract, `kamal-proxy` naming untouched)
 - [ ] Branch rooted off `main`, PR opened against `main`
 - [ ] PR created with description

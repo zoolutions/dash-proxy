@@ -1,0 +1,31 @@
+AGENTS.md
+  s_f5a1e2cf907cda::t_a6b9536ec21521 97
+.claude/agents/fable-validator.md
+  s_f5a1e2cf907cda::t_f3ab76b80c6c6d 24
+.claude/commands/lfg.md
+  s_f5a1e2cf907cda::t_388f9b317cdcf3 66
+  s_f5a1e2cf907cda::t_7743a10bb76f3c 224-229
+  s_f5a1e2cf907cda::t_1b7eaad84ed208 335
+.claude/commands/finish-prs.md
+  s_f5a1e2cf907cda::t_6f324647a8557e 131-132
+.claude/commands/architect.md
+  s_f5a1e2cf907cda::t_e45a1f9f819264 99
+.claude/commands/plan.md
+  s_f5a1e2cf907cda::t_b6c1be315d7669 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e110afa755c7e3f4bee2d667839378c0b629a445",
+  "prompts": {},
+  "sessions": {
+    "s_f5a1e2cf907cda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e4364a9-bbf5-490a-b746-666bffd199ec",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}

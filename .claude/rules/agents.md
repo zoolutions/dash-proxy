@@ -2,11 +2,11 @@
 
 ## Available Agents
 
-| Agent | Purpose | When to Use |
-|-------|---------|--------------|
-| Explore | Codebase exploration | Finding files, tracing RPC call sites, understanding cert-manager patterns |
-| Plan | Implementation planning | New cert providers, router/target changes, upstream-merge conflict strategy |
-| general-purpose | Multi-step tasks | Cross-branch searches, multi-file refactors, release prep |
+| Agent | Model | Purpose | When to Use |
+|-------|-------|---------|--------------|
+| Explore | `model: haiku` | Codebase exploration | Finding files, tracing RPC call sites, understanding cert-manager patterns |
+| Plan | `model: sonnet` | Implementation planning | New cert providers, router/target changes, upstream-merge conflict strategy |
+| general-purpose | `model: sonnet` | Multi-step tasks | Cross-branch searches, multi-file refactors, release prep |
 
 ## Immediate Agent Usage
 

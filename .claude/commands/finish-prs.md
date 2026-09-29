@@ -1,7 +1,7 @@
 ---
 description: "Drive a set of open dash-proxy PRs to merge-ready, one at a time, in a given order. Merges the base forward (never rebases — published branches are shared), runs /github-review-pr (conflicts, then CI failures, then review comments) on each, then waits for the user to merge before syncing and advancing to the next. Use to clear a stack of stacked/parallel PRs without manual merge churn."
 model: opus
-argument-hint: "ordered PR list (e.g. '12 14 15 18'); optional 'automerge' to enable gh auto-merge; empty = auto-discover your open PRs"
+argument-hint: "ordered PR list (e.g. '12 14 15 18'); optional 'automerge' to merge each PR once every check is green (no gh auto-merge); empty = auto-discover your open PRs"
 allowed-tools: Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr diff:*), Bash(gh pr comment:*), Bash(gh pr merge:*), Bash(gh api:*), Bash(gh run view:*), Bash(git:*), Bash(make:*), Bash(go test:*), Bash(go vet:*), Bash(go mod:*), Bash(gofmt:*), Bash(cd:*), Read, Write, Edit, Glob, Grep, Agent, Skill, TaskCreate, TaskUpdate, TaskGet, TaskList, ScheduleWakeup
 ---
 

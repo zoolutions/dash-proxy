@@ -96,6 +96,7 @@ Reference: `AGENTS.md` "Architecture" section for the one-line version; `ROADMAP
 - [ ] `make test` passes
 - [ ] `gofmt -l internal/ cmd/` empty
 - [ ] `make lint` noted for CI (golangci-lint isn't installed locally — don't block on it)
+- [ ] Run the `fable-validator` agent on the combined diff first; do not open or merge on BLOCK.
 
 ## Handoff
 

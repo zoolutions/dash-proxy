@@ -2,7 +2,7 @@
 description: "Coordinates development across dash-proxy layers (cmd -> RPC -> server). Use when planning multi-layer features, orchestrating implementation order, or designing new subsystems."
 model: opus
 argument-hint: "feature or task to coordinate"
-allowed-tools: Read, Grep, Glob, Bash(make test:*), Bash(make build:*), Bash(make lint:*), Bash(gofmt:*), Bash(go build:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*)
+allowed-tools: Read, Grep, Glob, Agent, Bash(make test:*), Bash(make build:*), Bash(make lint:*), Bash(gofmt:*), Bash(go build:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*)
 ---
 
 # Dash-Proxy Architect Mode

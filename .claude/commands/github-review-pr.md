@@ -29,12 +29,12 @@ Conflicts-first, then failures-first eliminates this confusion. CI is either gre
 
 This is a maintained fork, not a normal repo. Before either phase, ground yourself in:
 
-- `AGENTS.md` — Critical Rules: `kamal-proxy` module/binary/RPC/socket naming is load-bearing, `main` is fast-forward-only (never commit to it), tags are four-segment `vX.Y.Z.N`, no `git push --tags`.
+- `AGENTS.md` — Critical Rules: `kamal-proxy` module/binary/RPC/socket naming is load-bearing, `main` changes only through merged PRs (never commit to it), tags are four-segment `vX.Y.Z.N`, no `git push --tags`.
 - `.claude/rules/git-workflow.md` — commit message format, branch model, pre-commit checklist.
 - `.claude/rules/upstream-sync.md` — merge conflict playbook if the PR touches `internal/cmd/run.go`, `internal/server/config.go`, `internal/server/router.go`, or `internal/server/service.go` (the two cert branches' overlap zone).
 - `.claude/rules/testing.md` — 100% coverage floor for Router, LoadBalancer, SANCertManager, cert registry, RPC commands.
 
-**The PR must target `dash`, not `main`.** If `gh pr view` shows a base of `main`, stop and flag it — that branch only accepts fast-forward merges from upstream.
+**The PR must target `main`.** If `gh pr view` shows any other base, stop and flag it — that PR is misdirected.
 
 ## Phase 0: Determine the PR Number
 
@@ -77,10 +77,7 @@ gh pr view <PR_NUMBER> --repo zoolutions/dash-proxy --json mergeable,mergeStateS
 
 ### Which branch do you merge? (fork-specific — decide BEFORE merging)
 
-`dash` is this fork's main branch and feature branches root off it, so the answer is normally simple:
-
-1. **Merge `origin/dash`** — this is the sanctioned forward merge. Branches are no longer kept upstream-PR-able, so there is nothing to contaminate.
-2. **Only reach for `git merge origin/main`** on an old branch that still roots off `main`, or when you specifically want upstream fixes that have not yet reached `dash`. Re-check mergeability against `main` afterwards.
+The base is `main` and feature branches root off it, so the answer is simple: **merge `origin/main`** — this is the sanctioned forward merge.
 
 Note `git rerere` is enabled: previously-seen conflicts auto-replay their resolutions — review what rerere staged before trusting it.
 
@@ -129,7 +126,7 @@ Before moving to Phase B, one of these must be true:
 
 - All CI checks are green on the latest pushed commit. OR
 - All CI checks are pending (running) on the latest pushed commit, AND no checks failed in the most recent completed run on this commit. OR
-- A persistent CI failure exists that is **not caused by changes on this branch** (e.g., a flaky test on `dash`, an `actionlint`/`zizmor` finding pre-existing on the base branch). Report this explicitly and proceed to Phase B with the caveat noted.
+- A persistent CI failure exists that is **not caused by changes on this branch** (e.g., a flaky test on `main`, an `actionlint`/`zizmor` finding pre-existing on the base branch). Report this explicitly and proceed to Phase B with the caveat noted.
 
 If failures persist on this branch's changes, **do NOT proceed to Phase B**. Report what's still failing, what's been tried, and ask the user how to proceed.
 
@@ -166,7 +163,7 @@ After all phases complete, report:
 2. **Phase A summary**: which CI failures were diagnosed and fixed. Note the commit SHAs for the fixes.
 3. **Phase B summary**: which review comments were accepted (with commit SHAs), which were pushed back on (with reasoning), and the final unresolved-thread count (should be 0).
 4. **End state**: final mergeability + CI status on the latest commit.
-5. **Outstanding work**: anything that still needs attention — e.g., CI was pending at the end of Phase B and the user should verify the latest run after the comment fixes; or the PR is ready for `make docker` smoke-testing before merge to `dash`.
+5. **Outstanding work**: anything that still needs attention — e.g., CI was pending at the end of Phase B and the user should verify the latest run after the comment fixes; or the PR is ready for `make docker` smoke-testing before merge to `main`.
 
 ---
 

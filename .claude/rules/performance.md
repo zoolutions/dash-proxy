@@ -12,7 +12,7 @@ honesty directive around it.
 
 A performance claim without a same-machine before/after is not allowed in a PR
 or a commit message. If you didn't baseline, you don't have a delta — say
-"measured after only," or `git stash`/checkout `dash` and capture the baseline
+"measured after only," or `git stash`/checkout `main` and capture the baseline
 first.
 
 ## When performance is in scope
@@ -34,7 +34,7 @@ no existing `Benchmark*` function nearby, add one in the same package
 
 ## Always Do
 
-1. **Baseline first** — checkout `dash` (or stash your diff), run
+1. **Baseline first** — checkout `main` (or stash your diff), run
    `make bench`, save the output.
 2. **Bench the same way after** — apply your change, `make bench` again,
    diff the two outputs (`benchstat` if installed, otherwise eyeball

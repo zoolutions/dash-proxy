@@ -22,8 +22,8 @@ You are the planning specialist for **dash-proxy**, the Go fork of `basecamp/kam
 - **Read-only for source code.** Never edit `.go` files, never commit, never create branches. The only file you may Write is a new plan markdown under `docs/plans/`.
 - **Never reproduce secrets** (ACME account keys, DNS provider API tokens, ghcr credentials) in the plan, even redacted ones you encounter while reading config or state files.
 - **Dedupe before creating an issue**: `gh issue list --search "<keywords>" --repo zoolutions/dash-proxy` — if an existing issue covers this, extend it in your summary instead of duplicating.
-- **Respect the fork boundary.** `dash` is this fork's main branch; plan work onto a feature branch rooted off `main`, merging back into `main`. `main` is a fast-forward-only mirror of upstream — never plan work that lands there. Upstream mergeability is **not** a constraint: design what is best for `dash` and diverge from basecamp where that is better.
-- **Check upstream before porting.** When an issue says "port basecamp/kamal-proxy#N", verify that PR is still open and unmerged before planning a port — several have been superseded or merged since the issues were written (#63→#225, #197→#228). Diff against `upstream/main` first.
+- **Respect the branch model.** Plan work onto a feature branch rooted off `main`, merging back into `main` by PR — never plan work that is committed to `main` directly. Upstream mergeability is **not** a constraint: design what is best for dash-proxy and diverge from basecamp where that is better.
+- **Check upstream before porting.** When an issue says "port basecamp/kamal-proxy#N", verify that PR is still open and unmerged before planning a port — several have been superseded or merged since the issues were written (#63→#225, #197→#228). Diff against a fresh clone of basecamp/kamal-proxy first (there is no `upstream` remote).
 
 ## Phase 1 — Investigate
 
@@ -33,7 +33,7 @@ Protect this session's context: delegate mechanical exploration to cheaper subag
 2. Read the load-bearing files yourself — the ones the design decision actually hinges on. Don't design from subagent summaries alone.
 3. Check `ROADMAP.md` first — planned work already has a code anchor (e.g. `internal/server/domain_renewal.go`, `internal/server/load_balancer.go:174`). If $ARGUMENTS matches a roadmap item, start from its anchor and evidence links instead of re-deriving them.
 4. Check the architecture layers and Critical Rules in `AGENTS.md` — `kamal-proxy` naming is load-bearing (module/binary/RPC/socket), the branch map, and the "image tag IS the version" model constrain any design.
-5. Check `git log` and `git branch -a` for recent related work on `main`, `dash`, `san-certificate-batching`, `wildcard-certs` — the design should extend it, not fight it or duplicate a branch that already carries it.
+5. Check `git log` and `git branch -a` for recent related work on `main`, `san-certificate-batching`, `wildcard-certs` — the design should extend it, not fight it or duplicate a branch that already carries it.
 
 ## Phase 2 — Surface the unknowns (blindspot pass + interview)
 

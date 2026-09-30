@@ -107,4 +107,4 @@ make docker && docker run --rm kamal-proxy kamal-proxy -h   # image smoke test
 
 - `AGENTS.md` — architecture layers, branch map, release ordering
 - `.claude/rules/upstream-sync.md` — merge conflict playbook for `router.go`/`config.go`/`service.go` during sync; test after every merge, not just before push
-- `ROADMAP.md` — planned fork features that will need their own test coverage before merging to `dash`
+- `ROADMAP.md` — planned fork features that will need their own test coverage before merging to `main`

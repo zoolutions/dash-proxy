@@ -11,7 +11,7 @@ You are reviewing and responding to all unresolved review comments on a GitHub p
 
 **Fork context first.** This repo is a fork of `basecamp/kamal-proxy`, not a normal project. Before evaluating anything, know:
 
-- PRs target `dash`, never `main` -- `main` is a fast-forward-only mirror of upstream and never receives commits
+- PRs target `main` -- nothing is pushed to `main` directly; it changes only through merged PRs
 - `kamal-proxy` naming (module, binary, RPC service, socket) is load-bearing -- see `AGENTS.md` Critical Rules #1; never accept a rename suggestion
 - Tags are four-segment `vX.Y.Z.N`, never suffix forms like `v1.0.0-rc1` -- see `.claude/rules/git-workflow.md`
 - Full sync/branch rules: `.claude/rules/upstream-sync.md`, `.claude/rules/git-workflow.md`
@@ -35,13 +35,13 @@ gh pr list --author=@me --head="$(git branch --show-current)" --state=open --jso
 
 If exactly one open PR exists for the current branch, use it. If none or multiple, ask the user.
 
-Once you have the PR number, confirm it -- and confirm the base branch is `dash`, not `main`:
+Once you have the PR number, confirm it -- and confirm the base branch is `main`:
 
 ```bash
 gh pr view <PR_NUMBER> --json title,state,url,baseRefName
 ```
 
-If `baseRefName` is `main`, stop and flag it -- that PR is misdirected (see Branch Model above); don't process review comments on it as if it were normal.
+If `baseRefName` is not `main`, stop and flag it -- that PR is misdirected (see Branch Model above); don't process review comments on it as if it were normal.
 
 ---
 

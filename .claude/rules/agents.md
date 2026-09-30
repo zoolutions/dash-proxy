@@ -12,7 +12,7 @@
 
 Use agents PROACTIVELY without waiting for user prompt:
 
-1. **Cert/ACME feature requests** -> Plan agent first — `san_cert_manager.go` and `acme/` have union-merge conflict surface with `dash`, get the approach right before touching code
+1. **Cert/ACME feature requests** -> Plan agent first — `san_cert_manager.go` and `acme/` have union-merge conflict surface with `main`, get the approach right before touching code
 2. **"Where does X happen" questions** -> Explore agent over `internal/server` or `internal/cmd`, not manual grep
 3. **Multi-file searches** -> Explore agent (not direct Glob/Grep) — e.g. finding all 9 RPC client call sites for a `commands.go` rename
 4. **Upstream-merge conflict resolution** -> Plan agent, cross-reference `.claude/rules/upstream-sync.md`'s conflict playbook first

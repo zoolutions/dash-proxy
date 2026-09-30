@@ -105,7 +105,7 @@ func (p *PauseController) GetState() PauseState {
 
 ## gofmt & Lint
 
-- `gofmt -l internal/ cmd/` must print nothing before you push — CI enforces this on `main` and `dash`
+- `gofmt -l internal/ cmd/` must print nothing before you push — CI enforces this on `main`
 - `make lint` runs `golangci-lint`. Install the version `.github/workflows/ci.yml` pins (`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3`) and run it before pushing — `gofmt` and `go vet` do not catch what staticcheck does
 - No `golangci-lint:disable` comments to silence a real finding — fix the code, or ask upstream/CI to justify the exception in the PR description
 

@@ -14,9 +14,8 @@ any performance claim is backed by numbers.
 
 **Measure BEFORE you change.** A delta you didn't baseline is not a delta. If
 a change already landed without a baseline, reconstruct one from `main` in a
-**worktree** — never the primary tree, and never on `dash`. `main` is a
-fast-forward-only mirror of upstream (`AGENTS.md`); a worktree keeps the
-baseline checkout disposable and never risks a stray commit landing there.
+**worktree** — never the primary tree. A worktree keeps the baseline
+checkout disposable and never risks a stray commit landing on `main`.
 
 ## Workflow
 

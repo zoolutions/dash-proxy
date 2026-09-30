@@ -9,7 +9,7 @@ allowed-tools: Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr diff:*), Bas
 
 You are diagnosing and fixing CI failures on a `zoolutions/dash-proxy` pull request. Work systematically: identify failures, read logs, diagnose root causes, fix locally, verify, push.
 
-**Fork boundary first**: confirm the PR's base branch is `dash` (or a feature branch merging into it), never `main` — `main` is a fast-forward-only mirror of upstream and this command must never push a fix there. See `.claude/rules/upstream-sync.md`.
+**Branch model first**: confirm the PR's base branch is `main` (or a feature branch merging into it) — this command must never push a fix directly to `main`. See `.claude/rules/git-workflow.md`.
 
 ## Phase 0: Determine the PR Number
 
@@ -44,7 +44,7 @@ gh pr view <PR_NUMBER> --repo zoolutions/dash-proxy --json title,state,url,baseR
 gh pr checks <PR_NUMBER> --repo zoolutions/dash-proxy
 ```
 
-`ci.yml` runs two jobs per push/PR against `main` and `dash`; `docker-publish.yml` only fires on tag push, so it is never a PR check.
+`ci.yml` runs two jobs per push/PR against `main`; `docker-publish.yml` only fires on tag push, so it is never a PR check.
 
 | Check | Job | What it runs | How to get logs |
 |---|---|---|---|
@@ -108,7 +108,7 @@ Look for:
 - Whether it's a genuine regression vs an environment-only failure
 
 **Key patterns**:
-- `undefined: X` / `X.Y undefined (type *Z has no field or method Y)` -> API drift, check recent upstream merges (`git log --oneline main..dash -- internal/`)
+- `undefined: X` / `X.Y undefined (type *Z has no field or method Y)` -> API drift, check what `main` has that the branch lacks (`git log --oneline HEAD..origin/main -- internal/`)
 - `panic: runtime error` -> nil deref or index bug, read the failing test's setup
 - `expected X, got Y` -> logic bug or the test needs updating for a real behavior change
 - Cert/ACME test failures -> check `internal/server/acme/` and `san_cert_manager.go` first; these are the fork's own code, most likely to regress on a `main` merge
@@ -160,7 +160,7 @@ EOF
 git push
 ```
 
-Never push directly to `main`. If the PR's base is `main`, stop and tell the user — that branch only fast-forwards from upstream.
+Never push directly to `main`. If the PR's base is not `main`, stop and tell the user — PRs target `main`.
 
 ---
 
@@ -180,7 +180,7 @@ If you can identify that certain failures will persist for environmental reasons
 |---|---|
 | golangci-lint findings that can't be reproduced locally | linter isn't installed in this sandbox; CI is the only source of truth, so expect at least one extra push/verify cycle |
 | Integration-style tests exercising a published proxy image | need `ghcr.io/zoolutions/dash-proxy` at a real tag; nothing to fix if the image itself hasn't been released yet — see release ordering in `../kamal/.claude/rules/upstream-sync.md` |
-| Architecture-dependent test failures surfaced only on `dash`'s multi-arch build | check whether the failure is amd64/arm64-specific before "fixing" logic that's actually fine on the developer's arch |
+| Architecture-dependent test failures surfaced only on the multi-arch build | check whether the failure is amd64/arm64-specific before "fixing" logic that's actually fine on the developer's arch |
 
 ---
 
@@ -188,7 +188,7 @@ If you can identify that certain failures will persist for environmental reasons
 
 - **Read before fixing** — always read the actual failing code before attempting a fix
 - **Fix the root cause** — don't add `//nolint` to bypass lint; fix the actual issue
-- **Don't fix unrelated failures** — if a test was already failing on `dash`, note it but don't fix it in this PR
+- **Don't fix unrelated failures** — if a test was already failing on `main`, note it but don't fix it in this PR
 - **Respect `AGENTS.md`'s Never Do list** — no renaming `kamal-proxy` (module/binary/RPC/socket), no suffix tags like `v1.0.0-rc1`, and prefer leaving `Dockerfile`/`Makefile` as basecamp has them so their fixes merge cleanly (per `.claude/rules/upstream-sync.md`)
 - **Flaky tests** — if a test passes locally but fails in CI, note it as potentially flaky rather than adding workarounds
 - **Don't retry CI blindly** — diagnose first, fix, then push. Each push triggers a full CI run.

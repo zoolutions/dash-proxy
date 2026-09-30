@@ -15,9 +15,9 @@ This is a fork, and its branch model changes what "sync the PR" means. Read `.cl
 
 | Rule | Consequence for this command |
 |---|---|
-| PRs target `dash`, never `main` | The base you sync against is `origin/dash`. A PR with `baseRefName: main` is a bug — report it, don't process it. |
-| **Never rebase a published branch** | Every branch here has a PR, so it is published. Sync with **`git merge origin/dash`**, never `git rebase`. There is therefore **no force-push anywhere in this command** — merge commits push cleanly. |
-| Merging a PR lands on `dash`, not `main` | `main` doesn't move when a PR merges, so the *upstream* base is stable. What each merge invalidates is the others' relationship to `dash` — that's what the re-sync in Phase 2a absorbs. |
+| PRs target `main` | The base you sync against is `origin/main`. A PR with any other `baseRefName` is a bug — report it, don't process it. |
+| **Never rebase a published branch** | Every branch here has a PR, so it is published. Sync with **`git merge origin/main`**, never `git rebase`. There is therefore **no force-push anywhere in this command** — merge commits push cleanly. |
+| Merging a PR lands on `main` | Each merge moves `origin/main`, which invalidates the other PRs' relationship to it — that's what the re-sync in Phase 2a absorbs. |
 | `git rerere` is enabled | Previously-seen conflicts auto-replay their recorded resolutions. Always `git diff --staged` before trusting a replay — a resolution recorded in a different context can be wrong. |
 | The long-lived cert branches collide | `san-certificate-batching` and `wildcard-certs` both touch `run.go` / `config.go` / `router.go`. When two queued PRs descend from those branches, expect union-shaped conflicts on exactly those files — the playbook in `upstream-sync.md` names the resolution for each. |
 | `kamal-proxy` naming is load-bearing | Module, binary, RPC method names, and socket path stay `kamal-proxy` — no PR in the queue may rename them, whatever a review comment suggests. |
@@ -43,9 +43,9 @@ This is a fork, and its branch model changes what "sync the PR" means. Read `.cl
 
   Order **oldest-first** (`createdAt` ascending). The explicit `--limit` matters — `gh pr list` defaults to 30, so without it discovery silently drops older PRs once the queue grows past 30. Oldest-first is the safe default: the earliest PR is usually the one others were cut alongside, so merging it first minimizes downstream re-syncs. Show the discovered order and proceed.
 
-**Verify every PR's base is `dash`.** Any PR based on `main` is a mistake in the fork model — surface it immediately and exclude it from the queue rather than processing it.
+**Verify every PR's base is `main`.** Any PR based on another branch is a mistake — surface it immediately and exclude it from the queue rather than processing it.
 
-**Order matters.** Each merge into `main` invalidates the others' merge base against `main`. Processing in a fixed order means you merge the base forward into each remaining PR exactly once per upstream merge, not repeatedly. If the user gave an explicit order, honor it exactly — they may know a dependency the metadata doesn't show. When PRs descend from `san-certificate-batching` and `wildcard-certs`, order them deliberately: whichever lands first defines the shape the other must union into.
+**Order matters.** Each merge into `main` invalidates the others' merge base against `main`. Processing in a fixed order means you merge the base forward into each remaining PR exactly once per merge, not repeatedly. If the user gave an explicit order, honor it exactly — they may know a dependency the metadata doesn't show. When PRs descend from `san-certificate-batching` and `wildcard-certs`, order them deliberately: whichever lands first defines the shape the other must union into.
 
 Create a task list (TaskCreate) with one task per PR, in order, so progress is visible. Mark the current PR `in_progress`.
 
@@ -68,12 +68,12 @@ Never merge into a branch that is currently checked out in the **main working di
 
 Process PRs strictly in order. For the current PR:
 
-### 2a. Sync the branch onto the latest `dash`
+### 2a. Sync the branch onto the latest `main`
 
 ```bash
 git fetch origin main --quiet
 cd <worktree>
-git merge origin/dash
+git merge origin/main
 ```
 
 **Merge, never rebase.** If the merge conflicts, do NOT resolve it here — `/github-review-pr` Phase A0 owns conflict resolution and carries the per-file playbook (`go.mod`/`go.sum` → main's toolchain + deps, keep `go-acme/lego/v4`, then `go mod tidy`; `internal/cmd/run.go` → union of flags but register `--acme-email`/`--acme-directory` exactly once, since pflag panics on duplicates; `internal/server/config.go`, `router.go` → union of both cert subsystems' fields and methods; `internal/server/service.go` → read both sides, preserve upstream changes AND feature wiring; `Dockerfile`/`Makefile`/`bin/release` → always the base's). Abort the merge (`git merge --abort`) and let step 2d handle it — Phase A0 runs first inside that command by design.
@@ -108,7 +108,7 @@ git push origin <branch>
 
 Invoke `/github-review-pr <PR>` (via the Skill tool). It runs **conflicts (A0) → CI failures (A) → review comments (B)** — do not re-implement any of it. It will:
 
-- Resolve any merge conflict with `dash` semantically, per the conflict playbook, and push the merge commit.
+- Resolve any merge conflict with `main` semantically, per the conflict playbook, and push the merge commit.
 - Fix red CI checks (formatting, `go vet`, `go test ./...`, build) and push.
 - Address every unresolved review thread: implement valid fixes, push back with reasoning on wrong ones, resolve threads.
 
@@ -124,7 +124,7 @@ gh pr checks <PR>
 
 Merge-ready means: `baseRefName=main`, `mergeable=MERGEABLE`, every check finished and green (`gh pr checks <PR> --json name,bucket`: each bucket `pass` or `skipping`, none `pending`, none `fail`; wait while any is pending), and `reviewDecision` is `APPROVED` or empty (not `CHANGES_REQUESTED`). `main` requires no approving review; a `BLOCKED` mergeStateStatus with everything else green is not a missing approval (the ruleset's `code_scanning` rule, whose CodeQL results are not configured, is the likely cause): report it `needs-user` instead of merging or polling.
 
-`mergeable=UNKNOWN` is common right after a push and can persist for minutes. Don't poll it; verify locally per the `git merge-tree --write-tree --name-only origin/dash FETCH_HEAD` recipe in `/github-review-pr` Phase A0.
+`mergeable=UNKNOWN` is common right after a push and can persist for minutes. Don't poll it; verify locally per the `git merge-tree --write-tree --name-only origin/main FETCH_HEAD` recipe in `/github-review-pr` Phase A0.
 
 ### 2f. Hand off for merge
 
@@ -144,17 +144,16 @@ The loop is **gated on the target PR merging**, because each merge into `main` i
 - **automerge mode:** poll `gh pr view <PR> --json state --jq .state` until `MERGED`. Use `ScheduleWakeup` with a delay matched to CI duration (Go builds + `go test ./...` run a few minutes; poll ~240s) rather than a busy sleep. When merged, advance.
 - **default mode:** the user merges manually and will tell you (or you are re-invoked). On the next turn, re-check `gh pr view <PR> --json state`. If `MERGED`, advance to the next PR and repeat Phase 2 (its re-sync now picks up the just-merged changes). If not yet merged, report current status and stop — do not spin.
 
-When you advance, **always re-fetch and merge `origin/dash` forward into the next PR** (Phase 2a) before doing anything else — the merge that just landed is exactly the change it needs to absorb.
+When you advance, **always re-fetch and merge `origin/main` forward into the next PR** (Phase 2a) before doing anything else — the merge that just landed is exactly the change it needs to absorb.
 
 If the user merges a PR **out of the planned order**, adapt: drop it from the remaining list and re-sync whatever is now next.
 
 ---
 
-## Phase 4 (optional): upstream drift and release ordering
+## Phase 4 (optional): release ordering
 
-Two fork-specific things worth surfacing once, at the end, rather than fixing mid-queue:
+One thing worth surfacing once, at the end, rather than fixing mid-queue:
 
-- **Upstream drift.** If several PRs in the queue conflicted against `main` in the same file, `main` may have moved and `dash` may be behind it. The durable fix is the routine sync in `.claude/rules/upstream-sync.md` (`git checkout main && git merge --ff-only upstream/main`, then merge `main` forward into the cert branches and `dash`) — commits to shared branches, so mention it, don't do it unprompted.
 - **Release ordering.** If the merged work changes proxy behavior the gem depends on, the proxy image releases **first** and the gem's `MINIMUM_VERSION` names an already-published tag second. The image has no version command — the tag IS the version. Flag this when the queue contains anything the `dash` gem will need to pin.
 
 ---
@@ -171,7 +170,7 @@ Then:
 
 1. What the user must do next (merge the ready ones, decide on any `needs-user` items).
 2. Any collision you resolved between the two cert subsystems — the union resolutions in `run.go` / `config.go` / `router.go` are the ones most likely to be subtly wrong, and worth a human read.
-3. Whether upstream drift or a release-ordering issue (Phase 4) is worth acting on.
+3. Whether a release-ordering issue (Phase 4) is worth acting on.
 
 ---
 
@@ -179,8 +178,8 @@ Then:
 
 - **Never rebase anything** — every branch here is published; merge forward only.
 - **Never force-push** — this command never rewrites history, so a plain `git push` always suffices.
-- **Never touch `main`** — not a commit, not a merge, not a push. It is a fast-forward-only mirror of `basecamp/kamal-proxy`.
-- **Never process a PR based on `main`** — report it as a fork-model mistake instead.
+- **Never commit or push to `main` directly** — it changes only through merged PRs.
+- **Never process a PR based on anything other than `main`** — report it as a mistake instead.
 - **Never resolve conflicts here** — abort and let `/github-review-pr` Phase A0 do it with the full playbook.
 - **Prefer taking the base's `Dockerfile`, `Makefile`, and `bin/release`** — release plumbing changes on its own PR, not as a merge side effect.
 - **Never rename the module, binary, RPC methods, or socket path** away from `kamal-proxy`.

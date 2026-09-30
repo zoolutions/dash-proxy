@@ -11,12 +11,12 @@ Execute a complete engineering workflow with verification at each phase, respect
 
 ## Phase 0: Branch Setup
 
-**BEFORE any other work, prepare the git branch. This is a fork — `main` is a fast-forward-only mirror of `basecamp/kamal-proxy`. NEVER commit to it.**
+**BEFORE any other work, prepare the git branch. `main` changes only through merged PRs. NEVER commit to it.**
 
 1. Check the current branch: `git branch --show-current`
 2. If NOT on `main`, switch: `git checkout main`
-3. Sync with upstream (do not assume `origin/main` is current): `git fetch upstream --tags --prune && git merge --ff-only upstream/main && git push origin main`
-4. Create feature branch **off `main`** (`dash` is this fork's main branch): `git checkout -b feature/{description}` (or `fix/{description}`, `issue-{number}-{brief-description}`)
+3. Sync with origin (do not assume your local `main` is current): `git pull --ff-only origin main`
+4. Create feature branch **off `main`**: `git checkout -b feature/{description}` (or `fix/{description}`, `issue-{number}-{brief-description}`)
 5. The branch merges **forward** into `main` at PR time — never rebase it once pushed. See `.claude/rules/git-workflow.md` and `.claude/rules/upstream-sync.md`.
 
 ---
@@ -209,7 +209,7 @@ make test                    # go test ./...
 go vet ./...
 ```
 
-If you have `golangci-lint` installed locally, also run `make lint` — but its absence is not a blocker; CI runs it on `main` and `dash`.
+If you have `golangci-lint` installed locally, also run `make lint` — but its absence is not a blocker; CI runs it on `main`.
 
 ### Solution Verification
 
@@ -254,7 +254,7 @@ Scope = the package/feature area, e.g. `san-cert`, `wildcard-certs`, `router`, `
 
 ### Push & PR
 
-**PRs target `dash`, never `main`** — `main` only ever fast-forwards from upstream.
+**PRs target `main`** — nothing is pushed to `main` directly.
 
 ```bash
 git push -u origin $(git branch --show-current)
@@ -309,10 +309,10 @@ audit trail for every decision the plan didn't make.
 
 ## Release (only if this workflow ends in a release)
 
-Not part of the default flow — only after a PR is merged to `dash` and a release is explicitly requested. Full runbook: `.claude/rules/upstream-sync.md`.
+Not part of the default flow — only after a PR is merged to `main` and a release is explicitly requested. Full runbook: `.claude/rules/git-workflow.md`.
 
 ```bash
-git checkout dash
+git checkout main && git pull --ff-only origin main
 bin/release                      # works out the next vX.Y.Z.N, tests, tags, pushes, publishes the release
 # CI publishes ghcr.io/zoolutions/dash-proxy:v1.0.0.0 (+ :latest)
 docker buildx imagetools inspect ghcr.io/zoolutions/dash-proxy:v1.0.0.0   # verify amd64+arm64

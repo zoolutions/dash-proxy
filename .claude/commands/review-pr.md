@@ -12,7 +12,7 @@ Review PR for fork-rule compliance, Go idioms, and pattern issues. Be concise.
 ## Workflow
 
 1. Fetch PR details and diff via `mcp__github__pull_request_read`
-2. Confirm base branch is `dash`, not `main` — anything targeting `main` is an instant blocker (see Fork Rules)
+2. Confirm base branch is `main` — anything targeting another branch is an instant blocker (see Fork Rules)
 3. Categorize changed files (RPC/CLI boundary, server internals, cert managers, upstream-owned files)
 4. Check for pattern violations
 5. Run local verification (`make build`, `make test`, `gofmt -l`)
@@ -22,7 +22,7 @@ Review PR for fork-rule compliance, Go idioms, and pattern issues. Be concise.
 
 | Check | Violation = blocker |
 |---|---|
-| Base branch | Targets `main` instead of `dash` |
+| Base branch | Targets anything other than `main` |
 | Tag grammar (if PR touches release scripts/CI) | `bin/release` and `docker-publish.yml`'s tag filter drifting apart — a tag that pushes but never builds |
 | `kamal-proxy` naming | Renames the module, binary, RPC service name, or socket path |
 | Release plumbing | Edits to `bin/release` or `docker-publish.yml` that move the tag grammar on one side only |
@@ -64,7 +64,7 @@ Direct target dial bypassing LoadBalancer    -> route through LoadBalancer.Start
 
 ## Fork Compliance
 
-- [ ] Targets `dash`, not `main`
+- [ ] Targets `main`
 - [ ] No `kamal-proxy` renames (module/binary/RPC/socket)
 - [ ] `bin/release` and `docker-publish.yml` still agree on the tag grammar
 - [ ] Tag/version references are four-segment `vX.Y.Z.N` if touched

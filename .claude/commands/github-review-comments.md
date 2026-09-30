@@ -105,7 +105,7 @@ For each unresolved comment, read the full body and categorise it:
 | Incorrect suggestion | Push back with technical reasoning |
 | Suggestion conflicts with architecture | Push back, reference `AGENTS.md` layers (`cmd/kamal-proxy` -> `internal/cmd` -> RPC -> `internal/server`) |
 | Renames `kamal-proxy` module/binary/RPC/socket | Reject outright -- `AGENTS.md` Critical Rules #1, load-bearing across 9 RPC client call sites and the Dockerfile |
-| Targets `main` or suggests committing there | Reject outright -- `main` is ff-only, see Branch Model |
+| Suggests committing directly to `main` | Reject outright -- `main` changes only through merged PRs, see Branch Model |
 | Over-engineering / YAGNI | Push back, explain why it's unnecessary |
 | Unclear | Ask for clarification (do NOT implement) |
 

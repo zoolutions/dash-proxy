@@ -9,7 +9,7 @@ allowed-tools: Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr diff:*), Bas
 
 You are diagnosing and fixing CI failures on a `zoolutions/dash-proxy` pull request. Work systematically: identify failures, read logs, diagnose root causes, fix locally, verify, push.
 
-**Branch model first**: confirm the PR's base branch is `main` (or a feature branch merging into it) — this command must never push a fix directly to `main`. See `.claude/rules/git-workflow.md`.
+**Branch model first**: confirm the PR's base branch is `main` — this command must never push a fix directly to `main`. See `.claude/rules/git-workflow.md`.
 
 ## Phase 0: Determine the PR Number
 

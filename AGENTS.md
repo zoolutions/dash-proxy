@@ -79,6 +79,16 @@ Tag push (`vX.Y.Z.N`) → `.github/workflows/docker-publish.yml` → multi-arch 
 - `make docker && docker run --rm kamal-proxy kamal-proxy -h` — image smoke test
 - CI (`ci.yml`): build + test + golangci-lint + actionlint/zizmor on `main`
 
+## Labels
+
+Every pull request carries exactly one `type` label and at least one `area`
+label from `.github/labels.yml` — never a `status` label. `/plan` labels the
+issue, `/lfg` copies the issue's labels onto the PR (or infers them:
+`bin/labels infer $(git diff --name-only origin/main...HEAD)`). Labels change in
+the manifest and reach GitHub with `bin/labels sync`, never through the UI.
+Rules: `.github/LABELS.md`. `bin/labels` + `.github/LABELS.md` are the shared
+labels kit (canonical copy in docs-kit): never edit them in place.
+
 ## Slash Commands
 
 | Command | Purpose |
@@ -104,7 +114,7 @@ before/after pictures **on the PR**, attached from the terminal, never a local p
 on request":
 
 ```bash
-gh pr create --attach './after.png#503 page restyled' --title … --body …   # picture in hand already
+gh pr create --attach './after.png#503 page restyled' --label <type> --label <area> --title … --body …   # picture in hand already
 gh pr comment <n> --attach './after.png#503 page restyled' --body 'Before/after for the 503 page.'
 gh pr comment <n> --attach ./before.png --attach ./after.png               # repeat the flag, up to 50 files
 ```

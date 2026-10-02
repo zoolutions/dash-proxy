@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: "/"
+    labels: [dependencies, devops]
     groups:
       github-actions:
         patterns:
@@ -13,6 +14,7 @@ updates:
 
   - package-ecosystem: gomod
     directory: "/"
+    labels: [dependencies, dx]
     groups:
       gomod:
         patterns:

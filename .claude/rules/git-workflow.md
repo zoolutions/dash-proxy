@@ -50,8 +50,9 @@ cert feature branches (`san-certificate-batching`, `wildcard-certs`) are merged 
 2. Make focused, atomic commits
 3. Run all validators before pushing (see checklist below)
 4. Open the PR against **`main`**, with description and test plan
-5. Request review
-6. Squash merge when approved (the ruleset requires linear history)
+5. Label the PR: exactly one `type` + at least one `area` (`gh pr create --label …`), never a `status` label. `bin/labels infer <changed paths>` gives the areas; the taxonomy is `.github/labels.yml`, the rules are `.github/LABELS.md`
+6. Request review
+7. Squash merge when approved (the ruleset requires linear history)
 
 ## Pre-Commit Checklist
 
@@ -107,4 +108,5 @@ There is no upstream sync anymore — `.claude/rules/upstream-sync.md` is a hist
 - **NEVER** rename the module/binary/RPC service/socket away from `kamal-proxy` — see `AGENTS.md` Critical Rules
 - **ALWAYS** run `gofmt -l` + `make test` before committing
 - **ALWAYS** write meaningful commit messages, WHY over WHAT
+- Labels are edited in `.github/labels.yml` and applied with `bin/labels sync`, never by hand in the GitHub UI. `bin/labels` and `.github/LABELS.md` are the zoolutions labels kit (canonical copy in docs-kit, see its LABELS_KIT.md): never edit them here — change docs-kit, then `script/labels-kit sync`
 - Keep commits small and focused, one logical change per commit

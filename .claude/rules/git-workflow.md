@@ -50,7 +50,7 @@ cert feature branches (`san-certificate-batching`, `wildcard-certs`) are merged 
 2. Make focused, atomic commits
 3. Run all validators before pushing (see checklist below)
 4. Open the PR against **`main`**, with description and test plan
-5. Label the PR: exactly one `type` + at least one `area` (`gh pr create --label …`), never a `status` label. `bin/labels infer <changed paths>` gives the areas; the taxonomy is `.github/labels.yml`, the rules are `.github/LABELS.md`
+5. Label the PR: exactly one `type` + at least one `area` (as `--label …` flags on the `gh pr create` call itself; `gh pr edit <n> --add-label …` if the PR is already open), never a `status` label. `bin/labels infer <changed paths>` gives the areas; the taxonomy is `.github/labels.yml`, the rules are `.github/LABELS.md`
 6. Request review
 7. Squash merge when approved (the ruleset requires linear history)
 

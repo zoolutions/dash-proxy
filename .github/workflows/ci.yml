@@ -11,7 +11,7 @@ on:
 jobs:
   lint-actions:
     name: GitHub Actions audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
 
@@ -29,7 +29,7 @@ jobs:
           advanced-security: false
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:

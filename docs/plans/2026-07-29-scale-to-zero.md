@@ -584,7 +584,7 @@ func (s *Service) MarshalJSON() ([]byte, error) {
 
 ## 8. New files
 
-`service.go` is **863 lines**, already over the 800-line ceiling in `.claude/rules/coding-style.md`. `router_test.go` is over it too. Nothing substantial goes in either.
+`service.go` is **1043 lines**, already over the 800-line ceiling in `AGENTS.md` → Go Conventions. `router_test.go` is over it too. Nothing substantial goes in either.
 
 | File | Contents | ~lines |
 |---|---|---|

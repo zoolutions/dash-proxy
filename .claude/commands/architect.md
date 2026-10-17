@@ -70,7 +70,7 @@ Reference: `AGENTS.md` "Architecture" section for the one-line version; `ROADMAP
 | New middleware | Ordering in `service.go:458 createMiddleware`, and the SSE/WebSocket bypass in `response_buffer_middleware.go:86` |
 | TLS/cert work | `san_cert_manager.go` owns the whole surface — one ACME account, one allowlist, one rate limit; HTTP-01 and DNS-01 are strategies inside `san_cert_issuance.go` |
 | Metrics | `internal/metrics/metrics.go` — wire the setter, don't just define it (see ROADMAP R1) |
-| Anything upstream also touches | `.claude/rules/upstream-sync.md` conflict table — plan merge order, not just feature order |
+| Files other open PRs touch | `AGENTS.md` → Workflow → Conflicts — plan merge order, not just feature order |
 
 ## Common Mistakes to Avoid
 
@@ -96,7 +96,7 @@ Reference: `AGENTS.md` "Architecture" section for the one-line version; `ROADMAP
 - [ ] `make test` passes
 - [ ] `gofmt -l internal/ cmd/` empty
 - [ ] `make lint` noted for CI (golangci-lint isn't installed locally — don't block on it)
-- [ ] If this session implemented a change (a plan-only run has an empty diff, and the validator BLOCKs an empty change): run the `fable-validator` agent on the combined diff first, with the task or PR body as the issue and `main` as the base. On BLOCK do not open or merge: report the blockers instead of calling it ready.
+- [ ] If this session implemented a change (a plan-only run has an empty diff, and the validator BLOCKs an empty change): run the `flow:fable-validator` agent on the combined diff first, with the task or PR body as the issue and `main` as the base. On BLOCK do not open or merge: report the blockers instead of calling it ready.
 
 ## Handoff
 

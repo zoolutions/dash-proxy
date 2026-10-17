@@ -3,7 +3,7 @@
 **dash-proxy** (`zoolutions/dash-proxy`). Started as a fork of [basecamp/kamal-proxy](https://github.com/basecamp/kamal-proxy); the break is now clean — no upstream remote, no sync branch, their code arrives only by deliberate cherry-pick if ever. Carries the cert features they don't ship: SAN certificate batching and wildcard certs via DNS-01. Published as `ghcr.io/zoolutions/dash-proxy`; the Go module, binary, RPC service, socket, and image title label all stay `kamal-proxy` on purpose until the server-artifact rename ships a migration bridge. Consumed by the `dash` gem in `../kamal`.
 
 Project instructions for every agent: Claude Code (`CLAUDE.md` imports this file), Grok, Cursor,
-Copilot, Codex read it directly. Claude-only material (rules, commands) lives in `.claude/`.
+Copilot, Codex read it directly. Claude-only material (commands, settings) lives in `.claude/`.
 
 ## Tech Stack
 
@@ -48,6 +48,23 @@ Command output is condensed by rtk (PreToolUse hook) — `go`, `make`, `git`, `g
 this repo runs is already terse or already condensed by rtk's built-in support. Write commands in
 hook-rewritable shapes: no `for`/subshell wrappers, no `| head` on rtk-handled commands.
 
+## Workflow
+
+Facts the `flow` skills act on.
+
+- **Verify:** `gofmt -l internal/ cmd/` (must print nothing) · `make build` · `make test` · `make lint` (install the golangci-lint version `ci.yml` pins, `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3`) · `go test -race ./...` when `Router`, `LoadBalancer` or `PauseController` changed
+- **Specs:** fast loop `go test ./internal/server -run <Name>`; full suite `make test` (no Docker, no network); two worktrees at once: yes
+- **CI:** required `build` and `GitHub Actions audit` (ruleset); `ci.yml` jobs `lint-actions` (actionlint, zizmor) and `build` (build, test, lint); `security.yml` also runs; full suite on the PR; failure report none
+- **Review bot:** cubic (gitar-bot also comments)
+- **Merge:** squash — `gh pr merge <PR> --squash --delete-branch` (no merge queue; ruleset needs linear history and resolved threads)
+- **PR contract:** `## Summary` and `## Test plan`; exactly one `type` and at least one `area` label via `--label` (`bin/labels infer <paths>`, never `status`); screenshots only for `internal/pages/*.html`
+- **Conflicts:** merge `main` forward, never rebase a published branch; `go.mod` — union of requires, main's toolchain and versions, keep `go-acme/lego/v4`, then `go mod tidy`; never hand-merge `go.sum`
+- **Worktree setup:** none
+- **Release:** `bin/release` tags `vX.Y.Z.N` and publishes the GitHub Release, CI builds the image (Release & image above); an agent never runs it unsupervised; changelog none (generated release notes)
+- **Main health:** `gh run list --branch main --workflow ci.yml --limit 1 --json conclusion --jq '.[0].conclusion'`
+- **Upstream:** libraries we own `zoolutions/*` (the `dash` gem in `../kamal`); scrub none
+- **Bench:** `make bench` (`/perf` compares against `main`)
+
 ## Architecture
 
 ```
@@ -73,6 +90,32 @@ for deletion.
 
 Tag push (`vX.Y.Z.N`) → `.github/workflows/docker-publish.yml` → multi-arch build → `ghcr.io/zoolutions/dash-proxy:vX.Y.Z.N` + `:latest`. `GITHUB_TOKEN` authenticates; the ghcr package must stay PUBLIC (dash deploys and integration tests pull anonymously). The dash gem's `MINIMUM_VERSION` must always name a published tag — release here FIRST, then the gem. The old `ghcr.io/zoolutions/kamal-proxy` package stays published untouched — released gem versions still pull it.
 
+## Go Conventions
+
+- Files stay under 800 lines; `san_cert_manager.go` (688) and `router_test.go` (790) are near it — split before adding. One concern per file (`san_cert_manager.go` / `_issuance.go` / `_dynamic.go` / `_import.go`); fork-only additions keep their own files or packages (`internal/server/acme/`), not upstream-shaped ones like `cert.go`
+- Wrap errors with `fmt.Errorf("...: %w", err)`; compare sentinels from `internal/server/errors.go` with `errors.Is` (the one string-match is `isChunkedEncodingError`). RPC handlers return plain `error` over gob, so add enough context server-side to read standalone. No naked returns, no `//nolint` to silence a real finding
+- Every mutable field reachable from several goroutines (router targets, load balancer list, pause state) sits behind a `sync.Mutex`/`RWMutex` and is touched only through locked methods
+- New RPC verb: `<Verb>Args` in `internal/server/commands.go`, register the handler, add `internal/cmd/<verb>.go`; follow `deploy.go`/`DeployArgs`
+- Commit scope is the package or area (`san-cert`, `wildcard-certs`, `router`, `rpc`); branches `feature/`, `fix/`, `refactor/`, `ci/`, `chore/`
+- `bin/labels` and `.github/LABELS.md` are the shared labels kit (canonical copy in docs-kit): never edit them here
+
+## Testing Rules
+
+- Table-driven tests (one `t.Run` per case) for more than two cases; `testify` `assert`, and `require` for setup. Reuse `testRouter(t)`, `testBackend(t, body, status)`, `testLoadBalancerWithHandlers(t, ...)`; `t.TempDir()` + `t.Cleanup`, never a manual `os.RemoveAll`
+- Unit tests only in `make test`: `httptest.Server`/`NewRecorder` for backends and clients, ACME against `LetsEncryptStaging` or a mocked directory (the config defaults to production), no live DNS-01 providers, no Docker, no real RPC socket, no files outside `t.TempDir()`. Test `internal/cmd` flag validation (`preRun`) directly
+- 80% coverage minimum; 100% for `router.go`, `load_balancer.go`, `san_cert_manager.go`, `san_cert_issuance.go` + `acme/` (the allowlist and rate limit stop unbounded SNI-driven issuance), and `commands.go`
+- Fork-only code (SAN batching, wildcard certs) has no upstream test suite: it needs its own tests, including ACME failure, RPC dial failure and expired or missing cert paths
+
+## Performance Rules
+
+- A change to a hot path (`Router.ServeHTTP`/`serviceForRequest`, `Target.ServeHTTP`, `LoadBalancer`/`NewTargetList`, `SANCertManager.GetCertificate`) needs a same-machine `make bench` before and after (ns/op and allocs/op, and say whether the proxy or the network layer moved), with the numbers in the PR body. No claim of a speedup without them; if the path has no `Benchmark*` nearby, add one in the same package
+- Never optimize a cold path (`internal/cmd` runs once per CLI call), never trade routing, cert or health-check correctness for speed, never gate CI on a bench threshold (`make bench` is not in `ci.yml`)
+- Gem side (`../kamal`): no unnecessary shelling or SSHKit round-trips in `lib/kamal/` command construction
+
+## Agents
+
+Point Explore agents at one layer, not the tree: `internal/cmd` (cobra, one file per command), `internal/server` (router, service, load balancer, `*_middleware.go`, cert managers, `domain_issuer.go`/`domain_renewal.go`), `internal/server/acme` (DNS-01 providers). Use Plan before a cert/ACME feature. Never hand `bin/release` or a tag push to an agent unsupervised; the proxy image ships before the gem's `MINIMUM_VERSION` bump.
+
 ## Testing
 
 - `make test` — full Go suite, no Docker needed
@@ -81,33 +124,17 @@ Tag push (`vX.Y.Z.N`) → `.github/workflows/docker-publish.yml` → multi-arch 
 
 ## Labels
 
-Every pull request carries exactly one `type` label and at least one `area`
-label from `.github/labels.yml` — never a `status` label. `/plan` labels the
-issue, `/lfg` copies the issue's `type` and `area` labels onto the PR (never
-`plan` or another status label); a `docs/plans/*.md` plan carries them on its
-`Labels:` line. With neither, the type comes from the change's
-conventional-commit prefix and the areas from
-`bin/labels infer $(git diff --name-only origin/main...HEAD)`. Labels change in
-the manifest and reach GitHub with `bin/labels sync`, never through the UI.
-Rules: `.github/LABELS.md`. `bin/labels` + `.github/LABELS.md` are the shared
-labels kit (canonical copy in docs-kit): never edit them in place.
+Every pull request carries exactly one `type` label and at least one `area` label from `.github/labels.yml`, never a `status` label. The issue's `type` and `area` labels (or a `docs/plans/*.md` plan's `Labels:` line) carry over to the PR; with neither, the type comes from the conventional-commit prefix and the areas from `bin/labels infer $(git diff --name-only origin/main...HEAD)`. Labels change in the manifest and reach GitHub with `bin/labels sync`, never through the UI. Rules: `.github/LABELS.md`.
 
 ## Slash Commands
 
+The delivery skills (`/flow:lfg`, `/flow:plan`, `/flow:tdd`, `/flow:review-pr`, `/flow:finish-prs`, `/flow:github-review-*`, `/flow:follow-through`) come from the `flow` plugin (`.claude/settings.json`) and read **Workflow** below. Local commands:
+
 | Command | Purpose |
 |---------|---------|
-| `/lfg` | Full autonomous workflow: branch off `main` → understand → plan → TDD → verify → PR into `main` |
-| `/plan` | Read-only planning → GitHub issue or `docs/plans/` markdown (execute with `/lfg`) |
 | `/architect` | Coordinate work across the cmd → RPC → server layers |
-| `/tdd` | Enforce RED → GREEN → REFACTOR with Go table-driven tests |
 | `/security` | Audit TLS/cert handling, request parsing, header forwarding, ACME, the unix socket |
 | `/perf` | Baseline vs `main` in a worktree via `make bench` on the real hot paths |
-| `/review-pr` | Review a PR for pattern + fork-constraint compliance |
-| `/github-review-pr` | Full PR pass: fix CI failures, then process review comments |
-| `/github-review-failures` | Diagnose + fix CI failures until green |
-| `/github-review-comments` | Process unresolved PR review comments |
-
-**Models.** Sessions run on `opus` (Opus 5.5) with `fable` (Fable 5.1) as the advisor (`.claude/settings.json`). Fable is spent where judgment matters most: `/plan` runs on Fable, the advisor is consulted at decision points (before choosing an approach, a schema or public API, a migration, a dependency, anything irreversible, and when a failure repeats), and the `fable-validator` agent checks every finished implementation before its pull request opens (`/lfg`, Phase 6.5). Commands pin their tier by alias, never by full model ID: `opus` for orchestration, security, full PR review, payments and production debugging; `sonnet` for the implementation specialists and TDD; `haiku` for mechanical scans. Every spawned agent names its `model:`; one that does not runs on `sonnet` (`CLAUDE_CODE_SUBAGENT_MODEL`), never on the session's model. Plan mode cannot take a model of its own: it runs on Opus and asks the advisor.
 
 ## Screenshots on PRs and issues
 
@@ -130,6 +157,5 @@ after a verification run). No `--attach` flag means an old `gh`: `brew upgrade g
 ## More Documentation
 
 - `ROADMAP.md` — proxy-side roadmap with code anchors (strategy + sequencing in ../kamal/ROADMAP.md)
-- `.claude/rules/` — coding-style, git-workflow, testing, agents, performance, upstream-sync
-- `.claude/commands/` — the slash commands above
+- `.claude/commands/` — the local slash commands above
 - Gem fork: `../kamal/CLAUDE.md` — gem-side contract and release ordering

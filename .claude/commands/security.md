@@ -156,6 +156,6 @@ When complete, summarize:
 - Remediation steps
 - Tests to add (`make test` coverage, or gem-side Minitest via `../kamal/bin/test` if the finding is on the `kamal` side)
 
-Cross-reference `AGENTS.md` (architecture, load-bearing names), `.claude/rules/upstream-sync.md` (merge/release constraints — don't propose a fix that fights the union-merge conflict playbook), and `ROADMAP.md` before proposing structural changes.
+Cross-reference `AGENTS.md` (architecture, load-bearing names), `AGENTS.md` → Workflow (merge and release constraints), and `ROADMAP.md` before proposing structural changes.
 
 Now, focus on security review for the current task.

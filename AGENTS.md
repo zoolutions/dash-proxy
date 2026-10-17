@@ -54,7 +54,7 @@ Facts the `flow` skills act on.
 
 - **Verify:** `gofmt -l internal/ cmd/` (must print nothing) · `make build` · `make test` · `make lint` (install the golangci-lint version `ci.yml` pins, `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3`) · `go test -race ./...` when `Router`, `LoadBalancer` or `PauseController` changed
 - **Specs:** fast loop `go test ./internal/server -run <Name>`; full suite `make test` (no Docker, no network); two worktrees at once: yes
-- **CI:** required `build` and `GitHub Actions audit` (ruleset); `ci.yml` jobs `lint-actions` (actionlint, zizmor) and `build` (build, test, lint); `security.yml` also runs; full suite on the PR; failure report none
+- **CI:** required `build` and `GitHub Actions audit` (ruleset); `ci.yml` jobs `lint-actions` (actionlint, zizmor) and `build` (build, test, lint); `security.yml` runs on schedule or manual dispatch, not on PRs; full suite on the PR; failure report none
 - **Review bot:** cubic (gitar-bot also comments)
 - **Merge:** squash — `gh pr merge <PR> --squash --delete-branch` (no merge queue; ruleset needs linear history and resolved threads)
 - **PR contract:** `## Summary` and `## Test plan`; exactly one `type` and at least one `area` label via `--label` (`bin/labels infer <paths>`, never `status`); screenshots only for `internal/pages/*.html`
@@ -92,7 +92,7 @@ Tag push (`vX.Y.Z.N`) → `.github/workflows/docker-publish.yml` → multi-arch 
 
 ## Go Conventions
 
-- Files stay under 800 lines; `san_cert_manager.go` (688) and `router_test.go` (790) are near it — split before adding. One concern per file (`san_cert_manager.go` / `_issuance.go` / `_dynamic.go` / `_import.go`); fork-only additions keep their own files or packages (`internal/server/acme/`), not upstream-shaped ones like `cert.go`
+- Files stay under 800 lines; `san_cert_manager.go` and `router_test.go` are already over it — split before adding. One concern per file (`san_cert_manager.go` / `_issuance.go` / `_dynamic.go` / `_import.go`); fork-only additions keep their own files or packages (`internal/server/acme/`), not upstream-shaped ones like `cert.go`
 - Wrap errors with `fmt.Errorf("...: %w", err)`; compare sentinels from `internal/server/errors.go` with `errors.Is` (the one string-match is `isChunkedEncodingError`). RPC handlers return plain `error` over gob, so add enough context server-side to read standalone. No naked returns, no `//nolint` to silence a real finding
 - Every mutable field reachable from several goroutines (router targets, load balancer list, pause state) sits behind a `sync.Mutex`/`RWMutex` and is touched only through locked methods
 - New RPC verb: `<Verb>Args` in `internal/server/commands.go`, register the handler, add `internal/cmd/<verb>.go`; follow `deploy.go`/`DeployArgs`

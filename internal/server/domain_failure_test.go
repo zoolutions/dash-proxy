@@ -141,6 +141,16 @@ func TestParseRateLimited(t *testing.T) {
 			retryAfter:  boulderUTC,
 		},
 		{
+			name: "lego's RateLimitedError wrapper still parses",
+			err: &acme.RateLimitedError{
+				ProblemDetails: rateLimitedProblem(`too many failed authorizations (5) for "example.com", retry after 2026-08-21 06:00:00 UTC: see docs`),
+				RetryAfter:     "3600",
+			},
+			ok:          true,
+			identifiers: []string{"example.com"},
+			retryAfter:  boulderUTC,
+		},
+		{
 			name: "other problem types are not rate limits",
 			err: &acme.ProblemDetails{
 				Type:       "urn:ietf:params:acme:error:unauthorized",

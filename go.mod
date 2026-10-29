@@ -8,7 +8,7 @@ require (
 	github.com/coder/websocket v1.8.12
 	github.com/go-acme/lego/v4 v4.35.2
 	github.com/google/uuid v1.6.0
-	github.com/klauspost/compress v1.20.3
+	github.com/klauspost/compress v1.19.2
 	github.com/pires/go-proxyproto v0.15.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/quic-go/quic-go v0.60.0

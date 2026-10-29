@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -114,12 +115,18 @@ var retryAfterLayouts = []string{
 
 // parseRateLimited recognizes an ACME rateLimited rejection anywhere in an
 // error chain and extracts the identifiers it names — subproblem identifiers
-// plus quoted hostnames in the detail text — and the advertised retry time.
+// plus quoted hostnames in the detail text — and the latest advertised retry
+// time. A per-domain failure set counts only when every member is a rate
+// limit; a mixed set takes the attribution ladder instead.
 func parseRateLimited(err error) (acmeRateLimit, bool) {
-	var details *acme.ProblemDetails
-	if !errors.As(err, &details) || details.Type != acmeRateLimitedProblem {
+	problems, ok := rateLimitedProblems(err)
+	if !ok {
 		return acmeRateLimit{}, false
 	}
+	// lego's per-domain sets unwrap in map order; sort so the result is stable.
+	slices.SortFunc(problems, func(a, b *acme.ProblemDetails) int {
+		return strings.Compare(a.Detail, b.Detail)
+	})
 
 	limit := acmeRateLimit{}
 	seen := map[string]struct{}{}
@@ -134,23 +141,58 @@ func parseRateLimited(err error) (acmeRateLimit, bool) {
 		limit.identifiers = append(limit.identifiers, name)
 	}
 
-	for _, sub := range details.SubProblems {
-		add(sub.Identifier.Value)
-	}
-	for _, match := range quotedNamePattern.FindAllStringSubmatch(details.Detail, -1) {
-		add(match[1])
-	}
+	for _, details := range problems {
+		for _, sub := range details.SubProblems {
+			add(sub.Identifier.Value)
+		}
+		for _, match := range quotedNamePattern.FindAllStringSubmatch(details.Detail, -1) {
+			add(match[1])
+		}
 
-	if match := retryAfterPattern.FindStringSubmatch(details.Detail); match != nil {
-		for _, layout := range retryAfterLayouts {
-			if parsed, err := time.Parse(layout, match[1]); err == nil {
-				limit.retryAfter = parsed
-				break
+		if match := retryAfterPattern.FindStringSubmatch(details.Detail); match != nil {
+			for _, layout := range retryAfterLayouts {
+				if parsed, err := time.Parse(layout, match[1]); err == nil {
+					if parsed.After(limit.retryAfter) {
+						limit.retryAfter = parsed
+					}
+					break
+				}
 			}
 		}
 	}
 
 	return limit, true
+}
+
+// rateLimitedProblems walks an error tree for rateLimited problems. Single
+// wraps are followed down; at a multi-error node (lego's per-domain failure
+// sets, errors.Join) every branch must be a rate limit, so the answer does
+// not depend on which member lego's map iteration happens to put first.
+func rateLimitedProblems(err error) ([]*acme.ProblemDetails, bool) {
+	if details, ok := err.(*acme.ProblemDetails); ok {
+		return []*acme.ProblemDetails{details}, details.Type == acmeRateLimitedProblem
+	}
+
+	if multi, ok := err.(interface{ Unwrap() []error }); ok {
+		branches := multi.Unwrap()
+		if len(branches) == 0 {
+			return nil, false
+		}
+		problems := []*acme.ProblemDetails{}
+		for _, branch := range branches {
+			found, ok := rateLimitedProblems(branch)
+			if !ok {
+				return nil, false
+			}
+			problems = append(problems, found...)
+		}
+		return problems, true
+	}
+
+	if next := errors.Unwrap(err); next != nil {
+		return rateLimitedProblems(next)
+	}
+	return nil, false
 }
 
 // plausibleHostname filters quoted strings that cannot be order identifiers —

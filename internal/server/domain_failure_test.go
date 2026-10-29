@@ -81,6 +81,12 @@ func rateLimitedProblem(detail string) *acme.ProblemDetails {
 	}
 }
 
+// emptyMultiError is a multi-error with no members, which errors.Join cannot build.
+type emptyMultiError struct{}
+
+func (emptyMultiError) Error() string   { return "no members" }
+func (emptyMultiError) Unwrap() []error { return nil }
+
 func TestParseRateLimited(t *testing.T) {
 	boulderUTC := time.Date(2026, 8, 21, 6, 0, 0, 0, time.UTC)
 
@@ -139,6 +145,74 @@ func TestParseRateLimited(t *testing.T) {
 			ok:          true,
 			identifiers: []string{"example.com"},
 			retryAfter:  boulderUTC,
+		},
+		{
+			name: "lego's RateLimitedError wrapper still parses",
+			err: &acme.RateLimitedError{
+				ProblemDetails: rateLimitedProblem(`too many failed authorizations (5) for "example.com", retry after 2026-08-21 06:00:00 UTC: see docs`),
+				RetryAfter:     "3600",
+			},
+			ok:          true,
+			identifiers: []string{"example.com"},
+			retryAfter:  boulderUTC,
+		},
+		{
+			name: "per-domain failures that are all rate limits merge their names and take the latest retry",
+			err: errors.Join(
+				rateLimitedProblem(`too many failed authorizations (5) for "b.example.com", retry after 2026-08-21 07:00:00 UTC: see docs`),
+				rateLimitedProblem(`too many failed authorizations (5) for "a.example.com", retry after 2026-08-21 06:00:00 UTC: see docs`),
+			),
+			ok:          true,
+			identifiers: []string{"a.example.com", "b.example.com"},
+			retryAfter:  boulderUTC.Add(time.Hour),
+		},
+		{
+			name: "the latest retry wins whichever member advertises it",
+			err: errors.Join(
+				rateLimitedProblem(`too many failed authorizations (5) for "a.example.com", retry after 2026-08-21 07:00:00 UTC: see docs`),
+				rateLimitedProblem(`too many failed authorizations (5) for "b.example.com", retry after 2026-08-21 06:00:00 UTC: see docs`),
+			),
+			ok:          true,
+			identifiers: []string{"a.example.com", "b.example.com"},
+			retryAfter:  boulderUTC.Add(time.Hour),
+		},
+		{
+			name: "a name several members blame is listed once",
+			err: errors.Join(
+				rateLimitedProblem(`too many failed authorizations (5) for "example.com": see docs`),
+				rateLimitedProblem(`too many new orders for "example.com": see docs`),
+			),
+			ok:          true,
+			identifiers: []string{"example.com"},
+		},
+		{
+			name: "an empty per-domain failure set is not an account-level rate limit",
+			err:  emptyMultiError{},
+			ok:   false,
+		},
+		{
+			name: "a rate limit beside another problem type is not a rate limit (rate limit first)",
+			err: errors.Join(
+				rateLimitedProblem(`too many failed authorizations (5) for "a.example.com": see docs`),
+				&acme.ProblemDetails{Type: "urn:ietf:params:acme:error:dns", Detail: `no TXT record for "b.example.com"`, HTTPStatus: 400},
+			),
+			ok: false,
+		},
+		{
+			name: "a rate limit beside another problem type is not a rate limit (rate limit last)",
+			err: errors.Join(
+				&acme.ProblemDetails{Type: "urn:ietf:params:acme:error:dns", Detail: `no TXT record for "b.example.com"`, HTTPStatus: 400},
+				rateLimitedProblem(`too many failed authorizations (5) for "a.example.com": see docs`),
+			),
+			ok: false,
+		},
+		{
+			name: "a rate limit beside a plain error is not a rate limit",
+			err: errors.Join(
+				rateLimitedProblem(`too many failed authorizations (5) for "a.example.com": see docs`),
+				errors.New("dial tcp: i/o timeout"),
+			),
+			ok: false,
 		},
 		{
 			name: "other problem types are not rate limits",

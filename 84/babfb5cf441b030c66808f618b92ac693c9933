@@ -1,0 +1,19 @@
+internal/server/domain_failure_test.go
+  s_744d4e6b760b34::t_84c1b48199010f 144-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "84babfb5cf441b030c66808f618b92ac693c9933",
+  "prompts": {},
+  "sessions": {
+    "s_744d4e6b760b34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bbb8c6f2-d454-4a3b-9af4-50698ee0cdb4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}

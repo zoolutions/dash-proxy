@@ -125,13 +125,14 @@ func (s *Service) allTargets() TargetList {
 // the replaced balancer is still the one serving.
 //
 // A replaced target whose address lives on shared its gauge with its successor,
-// and has just drained it to zero, so the live targets report their count again.
+// and has just drained it to zero, so its successor reports its count again.
 func (r *Router) forgetDroppedTargets(name string, replaced *LoadBalancer) {
 	live := TargetList{}
 	if service := r.serviceForName(name); service != nil {
 		live = service.allTargets()
 	}
 	kept := live.Names()
+	shared := replaced.Targets().Names()
 
 	for _, target := range replaced.Targets() {
 		if slices.Contains(kept, target.Address()) {
@@ -142,6 +143,8 @@ func (r *Router) forgetDroppedTargets(name string, replaced *LoadBalancer) {
 	}
 
 	for _, target := range live {
-		target.refreshInFlight(name)
+		if slices.Contains(shared, target.Address()) {
+			target.refreshInFlight(name)
+		}
 	}
 }

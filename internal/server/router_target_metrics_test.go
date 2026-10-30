@@ -265,6 +265,77 @@ func TestRouter_ARequestOutlivingTheDrainLeavesTheLiveInFlightCount(t *testing.T
 	assert.Equal(t, 1, count)
 }
 
+// Only an address two targets shared needs its count put right. A target nothing
+// has been sent to yet has no series, and a deploy is no reason to start one.
+func TestRouter_ADeployStartsNoSeriesForANewAddress(t *testing.T) {
+	fake := installFakeTracker(t)
+	router := testRouter(t)
+	a, b := testHealthyBackend(t), testHealthyBackend(t)
+
+	testDeploy(t, router, a)
+	testDeploy(t, router, b)
+
+	_, ok := fake.targetInFlightCount("service1", b)
+	assert.False(t, ok)
+}
+
+// A remove while a deploy is draining takes the new target with it, and leaves
+// the old one for the deploy to forget once there is no service left to ask.
+func TestRouter_ForgetTarget_WhenTheServiceIsRemovedDuringTheDrain(t *testing.T) {
+	fake := installFakeTracker(t)
+	router := testRouter(t)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	_, a := testBackendWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == DefaultHealthCheckPath {
+			return
+		}
+
+		close(started)
+		<-release
+	})
+	b := testHealthyBackend(t)
+
+	testDeploy(t, router, a)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		req, _ := testLoggedRequest("service1")
+		router.ServeHTTP(httptest.NewRecorder(), req)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(testPoolArrivalTimeout):
+		close(release)
+		t.Fatal("the request never reached the target")
+	}
+
+	deployed := make(chan struct{})
+	go func() {
+		defer close(deployed)
+		testDeploy(t, router, b)
+	}()
+
+	require.Eventually(t, func() bool {
+		return router.serviceForName("service1").ActiveLoadBalancer().Targets().Names()[0] == b
+	}, time.Second, time.Millisecond)
+
+	require.NoError(t, router.RemoveService("service1"))
+	assert.Equal(t, testForgotten(b), fake.forgotten())
+
+	close(release)
+	<-done
+	<-deployed
+
+	assert.ElementsMatch(t, testForgotten(a, b), fake.forgotten())
+
+	_, ok := fake.targetInFlightCount("service1", b)
+	assert.False(t, ok, "the deploy has no live target left to report on")
+}
+
 func TestRouter_ListActiveServices_TargetDetails(t *testing.T) {
 	router := testRouter(t)
 	reader := testHealthyBackend(t)

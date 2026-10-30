@@ -272,7 +272,7 @@ func TestLoadBalancer_HealthyTargets(t *testing.T) {
 // a round trip in the way and drown it out.
 func BenchmarkLoadBalancer_ClaimTarget(b *testing.B) {
 	lb := benchmarkLoadBalancer(b)
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req, _ := testLoggedRequest("service1")
 
 	b.ReportAllocs()
 	for b.Loop() {

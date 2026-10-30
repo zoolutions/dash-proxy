@@ -156,6 +156,26 @@ func TestTargetQueueBucketsSeconds_MirrorTheWindowsBounds(t *testing.T) {
 	assert.InDelta(t, 5, buckets[len(buckets)-1], 1e-9)
 }
 
+// What each request pays with --metrics-port set. SetTargetInFlight runs twice per
+// request, and on the way in that is under the load balancer's lock.
+func BenchmarkPrometheusTracker_SetTargetInFlight(b *testing.B) {
+	Enable()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		Tracker.SetTargetInFlight("service1", "web-1:3000", 3)
+	}
+}
+
+func BenchmarkPrometheusTracker_TrackTargetRequest(b *testing.B) {
+	Enable()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		Tracker.TrackTargetRequest("service1", "web-1:3000", 12*time.Millisecond, 40*time.Millisecond, "app")
+	}
+}
+
 func TestNormalizeMethod(t *testing.T) {
 	assert.Equal(t, "GET", normalizeMethod("GET"))
 	assert.Equal(t, "POST", normalizeMethod("POST"))

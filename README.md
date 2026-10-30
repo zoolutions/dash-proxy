@@ -173,6 +173,84 @@ Paths are specified as the upstream receives them. Services deployed using
 stripped path prefixes should specify their excluded paths in the un-prefixed
 form.
 
+### Measuring request queue time
+
+Queue time is how long a request waited before your app started on it, which
+is the number to scale a web role on. The proxy measures it per target, and
+keeps the last 60 seconds of it where a single command can read it.
+
+Every request leaving the proxy carries `X-Dash-Request-Start: t=<unix ms>`. It
+is overwritten at every hop, so an app behind a load balancer reads a timestamp
+from its own host's clock. `X-Request-Start` is unchanged, and still set only
+when absent. To measure what only your app can see, subtract that timestamp from
+the moment it starts on the request and answer with the result in milliseconds:
+
+    Server-Timing: queue;dur=12.5
+
+When a response has no such entry, or one that is not a usable duration, the
+queue time is the proxy's own wait for a connection to the target. That wait is
+only meaningful with `--target-max-conns` set: with the default of no limit it is
+a dial or an idle-pool fetch, near zero, and your app's backlog stays invisible.
+So either send `Server-Timing`, or cap `--target-max-conns` at your app's thread
+count, which moves the queue into the proxy where it can be timed.
+
+`dash-proxy list --json` reports the window under each service, in `target_details`:
+
+```json
+{
+  "address": "web-1:3000",
+  "slot": "active",
+  "state": "healthy",
+  "in_flight": 3,
+  "queue": {
+    "window_seconds": 60,
+    "requests": 1250,
+    "sum_ms": 15625,
+    "max_ms": 340,
+    "p95_ms": 41.5,
+    "app": 1250,
+    "proxy": 0,
+    "buckets": [{ "le_ms": 1, "count": 12 }, { "le_ms": 2, "count": 48 }]
+  }
+}
+```
+
+* **`buckets` are cumulative**, like a Prometheus `le`, at 1, 2, 5, 10, 25, 50,
+  100, 250, 500, 1000, 2500 and 5000 ms. Add them up to merge targets or hosts.
+  A request over 5000 ms counts only in `requests`.
+* **`p95_ms` is read from those buckets**, by the rule `histogram_quantile` uses,
+  and tops out at 5000.
+* **`app` and `proxy`** say where the requests' numbers came from.
+* **`slot`** is `active` or `rollout`.
+
+With `--metrics-port` set, the same measurements go to Prometheus:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `kamal_proxy_target_queue_seconds` | histogram | `service`, `target` |
+| `kamal_proxy_target_upstream_ttfb_seconds` | histogram | `service`, `target` |
+| `kamal_proxy_target_in_flight` | gauge | `service`, `target` |
+
+A target's series are deleted once a deploy or `remove` has dropped its address
+and its requests have drained. The access log gains `queue_time` and
+`upstream_ttfb`, in nanoseconds like `duration`, on every response that came from
+a target.
+
+Things worth knowing:
+
+* **A deploy starts an empty window.** The window lives on the target, and a
+  deploy brings new ones, so the first 60 seconds afterwards read near zero.
+* **A target that stops answering records nothing.** A response the proxy renders
+  itself, such as a 504, and an attempt it retries are not samples, so a
+  saturated target that has stopped answering reads as *empty*, not as *slow*.
+  `in_flight` is what shows it.
+* **`in_flight` counts everything the target holds**, open WebSockets and event
+  streams included.
+* **`--exclude-metrics-path` applies here too.** Excluded requests stay out of the
+  window and the two histograms, so a monitor probing `/up` every second does not
+  drag the p95 down. They still count towards `in_flight`, and are still logged
+  with their `queue_time`.
+
 
 ### Choosing a log format
 

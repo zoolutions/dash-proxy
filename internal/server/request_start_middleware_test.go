@@ -28,6 +28,54 @@ func TestRequestStartMiddleware_AddsUnixMilliWhenNotPresent(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
+func TestRequestStartMiddleware_DashRequestStart(t *testing.T) {
+	tests := []struct {
+		name  string
+		prior string
+	}{
+		{name: "set when absent"},
+		{name: "overwritten when present", prior: "t=1234"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var headerValue string
+			handler := WithRequestStartMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headerValue = r.Header.Get("X-Dash-Request-Start")
+			}))
+
+			r := httptest.NewRequest("GET", "/", nil)
+			if tt.prior != "" {
+				r.Header.Set("X-Dash-Request-Start", tt.prior)
+			}
+			handler.ServeHTTP(httptest.NewRecorder(), r)
+
+			assert.Regexp(t, `^t=\d+$`, headerValue)
+
+			requestStartMilli, err := strconv.ParseInt(headerValue[2:], 10, 64)
+			assert.NoError(t, err)
+			assert.WithinDuration(t, time.Now(), time.UnixMilli(requestStartMilli), time.Second)
+		})
+	}
+}
+
+// An app behind a load balancer reads this header against its own host's clock,
+// so a value from a previous hop must not survive under any spelling of it.
+func TestRequestStartMiddleware_DashRequestStartReplacesEveryPriorValue(t *testing.T) {
+	var values []string
+	handler := WithRequestStartMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		values = r.Header.Values("X-Dash-Request-Start")
+	}))
+
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Add("X-Dash-Request-Start", "t=1")
+	r.Header.Add("X-Dash-Request-Start", "t=2")
+	handler.ServeHTTP(httptest.NewRecorder(), r)
+
+	assert.Len(t, values, 1)
+	assert.NotEqual(t, "t=1", values[0])
+}
+
 func TestRequestStartMiddleware_PreservesExistingHeaderWhenPresent(t *testing.T) {
 	handler := WithRequestStartMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "t=1234", r.Header.Get("X-Request-Start"))

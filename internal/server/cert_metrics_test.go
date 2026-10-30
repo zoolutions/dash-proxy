@@ -1,6 +1,7 @@
 package server
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,10 +36,20 @@ type fakeTracker struct {
 	redirectHits     map[string]int    // "service:status" -> count
 
 	denials map[string]int // "service:rule" -> count
+
+	targetRequests   []targetRequestSample
+	targetInFlight   map[string]int // "service/target" -> last value
+	forgottenTargets []string       // "service/target", in order
 }
 
 type certCountSample struct {
 	total, wildcard, http01 int
+}
+
+type targetRequestSample struct {
+	service, target string
+	queue, ttfb     time.Duration
+	source          string
 }
 
 func newFakeTracker() *fakeTracker {
@@ -57,6 +68,8 @@ func newFakeTracker() *fakeTracker {
 		redirectHits:     make(map[string]int),
 
 		denials: make(map[string]int),
+
+		targetInFlight: make(map[string]int),
 	}
 }
 
@@ -116,6 +129,43 @@ func (f *fakeTracker) TrackDenial(service, rule string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.denials[service+":"+rule]++
+}
+
+func (f *fakeTracker) TrackTargetRequest(service, target string, queue, ttfb time.Duration, source string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.targetRequests = append(f.targetRequests, targetRequestSample{service, target, queue, ttfb, source})
+}
+
+func (f *fakeTracker) SetTargetInFlight(service, target string, n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.targetInFlight[service+"/"+target] = n
+}
+
+func (f *fakeTracker) ForgetTarget(service, target string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.forgottenTargets = append(f.forgottenTargets, service+"/"+target)
+}
+
+func (f *fakeTracker) targetRequestSamples() []targetRequestSample {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.targetRequests)
+}
+
+func (f *fakeTracker) targetInFlightCount(service, target string) (int, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	count, ok := f.targetInFlight[service+"/"+target]
+	return count, ok
+}
+
+func (f *fakeTracker) forgotten() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.forgottenTargets)
 }
 
 func (f *fakeTracker) denialCount(service, rule string) int {

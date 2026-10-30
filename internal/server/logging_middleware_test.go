@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,6 +146,64 @@ func TestMiddleware_LoggingMiddlewareLogsTraceContextWhenPresent(t *testing.T) {
 	assert.Equal(t, "4bf92f3577b34da6a3ce929d0e0e4736", logline.TraceID)
 	assert.Equal(t, "00f067aa0ba902b7", logline.SpanID)
 	assert.Equal(t, "01", logline.TraceFlags)
+}
+
+func TestMiddleware_LoggingMiddlewareLogsQueueTimeWhenMeasured(t *testing.T) {
+	tests := []struct {
+		format   LogFormat
+		expected []string
+	}{
+		{format: LogFormatJSON, expected: []string{`"queue_time":12500000`, `"upstream_ttfb":40000000`}},
+		{format: LogFormatText, expected: []string{`queue_time=12500000`, `upstream_ttfb=40000000`}},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.format), func(t *testing.T) {
+			out := &strings.Builder{}
+			logger := slog.New(tt.format.NewHandler(out, nil))
+
+			middleware := WithLoggingMiddleware(logger, 80, 443, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				logging := LoggingRequestContext(r)
+				logging.QueueTime = 12500 * time.Microsecond
+				logging.UpstreamTTFB = 40 * time.Millisecond
+				logging.Measured = true
+			}))
+			middleware.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "http://app.example.com/", nil))
+
+			for _, expected := range tt.expected {
+				assert.Contains(t, out.String(), expected)
+			}
+		})
+	}
+}
+
+// A zero is a measurement like any other: an app can report that nothing queued.
+func TestMiddleware_LoggingMiddlewareLogsAQueueTimeOfZero(t *testing.T) {
+	out := &strings.Builder{}
+	logger := slog.New(slog.NewJSONHandler(out, nil))
+
+	middleware := WithLoggingMiddleware(logger, 80, 443, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		LoggingRequestContext(r).Measured = true
+	}))
+	middleware.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "http://app.example.com/", nil))
+
+	assert.Contains(t, out.String(), `"queue_time":0`)
+}
+
+// A response the proxy made itself measures nothing, and logs what it always did.
+func TestMiddleware_LoggingMiddlewareOmitsQueueTimeWhenNotMeasured(t *testing.T) {
+	for _, format := range []LogFormat{LogFormatJSON, LogFormatText} {
+		t.Run(string(format), func(t *testing.T) {
+			out := &strings.Builder{}
+			logger := slog.New(format.NewHandler(out, nil))
+
+			middleware := WithLoggingMiddleware(logger, 80, 443, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+			middleware.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "http://app.example.com/", nil))
+
+			assert.NotContains(t, out.String(), "queue_time")
+			assert.NotContains(t, out.String(), "upstream_ttfb")
+		})
+	}
 }
 
 // Every deployment that does not trace keeps the log line it has today: the

@@ -325,8 +325,9 @@ func (h *CacheMiddleware) revalidate(r *http.Request, lookup cacheLookup, stored
 
 	// Nobody is waiting on this fetch, so it must not inherit the client's
 	// cancellation -- nor its logging context, which belongs to the response
-	// already on its way out.
-	ctx := context.WithValue(context.WithoutCancel(r.Context()), contextKeyRequestContext, &loggingRequestContext{})
+	// already on its way out. The service name is carried over for the target's
+	// metrics: a series without one is a series ForgetTarget can never reach.
+	ctx := context.WithValue(context.WithoutCancel(r.Context()), contextKeyRequestContext, &loggingRequestContext{Service: h.config.Service})
 	ctx, cancel := context.WithTimeout(ctx, DefaultCacheRevalidateTimeout)
 
 	background := r.Clone(ctx)

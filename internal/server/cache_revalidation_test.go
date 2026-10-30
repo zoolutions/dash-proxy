@@ -102,6 +102,36 @@ func TestCacheMiddleware_RevalidationRefreshesFromA304WithoutABody(t *testing.T)
 	assert.Equal(t, "body", getCached(middleware, "http://example.com/p").Body.String())
 }
 
+// A background refresh gets a logging context of its own, and the target reads
+// the service off it to label its metrics. Without the name those land on a
+// series that no deploy or remove would ever delete.
+func TestCacheMiddleware_RevalidationKnowsItsService(t *testing.T) {
+	var origin atomic.Int64
+	seen := make(chan string, 4)
+
+	middleware, _ := testCacheHandler(t, CacheOptions{Enabled: true}, func(w http.ResponseWriter, r *http.Request) {
+		if origin.Add(1) > 1 {
+			seen <- LoggingRequestContext(r).Service
+		}
+		w.Header().Set("Cache-Control", "public, max-age=1, stale-while-revalidate=600")
+		w.Write([]byte("body"))
+	})
+
+	now := time.Now()
+	middleware.now = func() time.Time { return now }
+
+	getCached(middleware, "http://example.com/p")
+	now = now.Add(30 * time.Second)
+	getCached(middleware, "http://example.com/p")
+
+	select {
+	case service := <-seen:
+		assert.Equal(t, t.Name(), service)
+	case <-time.After(2 * time.Second):
+		t.Fatal("the stale hit never revalidated")
+	}
+}
+
 // When the target says the resource changed, the new body replaces the entry.
 func TestCacheMiddleware_RevalidationTakesAChangedBody(t *testing.T) {
 	var origin atomic.Int64

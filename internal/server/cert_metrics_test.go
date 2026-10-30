@@ -146,6 +146,7 @@ func (f *fakeTracker) SetTargetInFlight(service, target string, n int) {
 func (f *fakeTracker) ForgetTarget(service, target string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	delete(f.targetInFlight, service+"/"+target)
 	f.forgottenTargets = append(f.forgottenTargets, service+"/"+target)
 }
 

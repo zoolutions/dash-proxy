@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRequestStartMiddleware_AddsUnixMilliWhenNotPresent(t *testing.T) {
@@ -72,8 +73,9 @@ func TestRequestStartMiddleware_DashRequestStartReplacesEveryPriorValue(t *testi
 	r.Header.Add("X-Dash-Request-Start", "t=2")
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	assert.Len(t, values, 1)
-	assert.NotEqual(t, "t=1", values[0])
+	require.Len(t, values, 1)
+	assert.Regexp(t, `^t=\d+$`, values[0])
+	assert.NotContains(t, []string{"t=1", "t=2"}, values[0])
 }
 
 func TestRequestStartMiddleware_PreservesExistingHeaderWhenPresent(t *testing.T) {

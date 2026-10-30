@@ -188,6 +188,7 @@ func TestMiddleware_LoggingMiddlewareLogsAQueueTimeOfZero(t *testing.T) {
 	middleware.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "http://app.example.com/", nil))
 
 	assert.Contains(t, out.String(), `"queue_time":0`)
+	assert.NotContains(t, out.String(), "upstream_ttfb", "a target answering before the request was written has none")
 }
 
 // A response the proxy made itself measures nothing, and logs what it always did.

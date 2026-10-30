@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/basecamp/kamal-proxy/internal/metrics"
 )
 
 func testHealthyBackend(t *testing.T) string {
@@ -26,12 +28,69 @@ func testDeploy(t *testing.T, router *Router, targets ...string) {
 	require.NoError(t, router.DeployService("service1", targets, defaultEmptyReaders, defaultServiceOptions, defaultTargetOptions, defaultDeploymentOptions))
 }
 
+// testDeployInBackground reports on a channel, for the test goroutine to require:
+// a FailNow from any other goroutine would not stop the test.
+func testDeployInBackground(router *Router, targets ...string) <-chan error {
+	deployed := make(chan error, 1)
+	go func() {
+		deployed <- router.DeployService("service1", targets, defaultEmptyReaders, defaultServiceOptions, defaultTargetOptions, defaultDeploymentOptions)
+	}()
+
+	return deployed
+}
+
 func testForgotten(targets ...string) []string {
 	forgotten := []string{}
 	for _, target := range targets {
 		forgotten = append(forgotten, "service1/"+target)
 	}
 	return forgotten
+}
+
+// lockProbingTracker runs probe as each target is forgotten.
+type lockProbingTracker struct {
+	*fakeTracker
+	probe func()
+}
+
+func (l *lockProbingTracker) ForgetTarget(service, target string) {
+	l.probe()
+	l.fakeTracker.ForgetTarget(service, target)
+}
+
+// Installing a load balancer takes the router's write lock, so holding it while
+// working out what was dropped is what stops a concurrent deploy from bringing an
+// address back between that decision and the deletion.
+func TestRouter_ForgetTarget_HoldsTheRouterLockAgainstConcurrentDeploys(t *testing.T) {
+	tests := []struct {
+		name string
+		drop func(t *testing.T, router *Router)
+	}{
+		{name: "a deploy", drop: func(t *testing.T, router *Router) { testDeploy(t, router, testHealthyBackend(t)) }},
+		{name: "a remove", drop: func(t *testing.T, router *Router) { require.NoError(t, router.RemoveService("service1")) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := testRouter(t)
+			probes := 0
+
+			tracker := &lockProbingTracker{fakeTracker: newFakeTracker(), probe: func() {
+				probes++
+				if router.serviceLock.TryRLock() {
+					router.serviceLock.RUnlock()
+					t.Error("forgot a target outside the router's write lock")
+				}
+			}}
+			previous := metrics.SetTracker(tracker)
+			t.Cleanup(func() { metrics.SetTracker(previous) })
+
+			testDeploy(t, router, testHealthyBackend(t))
+			tt.drop(t, router)
+
+			assert.Equal(t, 1, probes)
+		})
+	}
 }
 
 func TestRouter_ForgetTarget_WhenADeployDropsAnAddress(t *testing.T) {
@@ -147,11 +206,7 @@ func TestRouter_ForgetTarget_WaitsForTheDrain(t *testing.T) {
 		t.Fatal("the request never reached the target")
 	}
 
-	deployed := make(chan struct{})
-	go func() {
-		defer close(deployed)
-		testDeploy(t, router, b)
-	}()
+	deployed := testDeployInBackground(router, b)
 
 	require.Eventually(t, func() bool {
 		return router.serviceForName("service1").ActiveLoadBalancer().Targets().Names()[0] == b
@@ -160,7 +215,7 @@ func TestRouter_ForgetTarget_WaitsForTheDrain(t *testing.T) {
 
 	close(release)
 	<-done
-	<-deployed
+	require.NoError(t, <-deployed)
 
 	assert.Equal(t, testForgotten(a), fake.forgotten())
 }
@@ -198,30 +253,32 @@ func TestRouter_RedeployToTheSameAddressLeavesTheLiveInFlightCount(t *testing.T)
 	}
 
 	testDeploy(t, router, a)
-	original := router.serviceForName("service1").ActiveLoadBalancer()
+	replaced := router.serviceForName("service1").ActiveLoadBalancer().Targets()[0]
 
 	oldDone := send("/old")
 	<-startedOld
 
-	deployed := make(chan struct{})
-	go func() {
-		defer close(deployed)
-		testDeploy(t, router, a)
-	}()
+	deployed := testDeployInBackground(router, a)
 
 	require.Eventually(t, func() bool {
-		return router.serviceForName("service1").ActiveLoadBalancer() != original
-	}, time.Second, time.Millisecond)
+		silenced := false
+		replaced.withInflightLock(func() { silenced = replaced.metricsSilenced })
+		return silenced
+	}, time.Second, time.Millisecond, "the old target goes quiet before it drains")
 
 	newDone := send("/new")
 	<-startedNew
 
 	close(releaseOld)
 	<-oldDone
-	<-deployed
 
 	count, ok := fake.targetInFlightCount("service1", a)
 	assert.True(t, ok)
+	assert.Equal(t, 1, count, "the old target stopped reporting when the drain began")
+
+	require.NoError(t, <-deployed)
+
+	count, _ = fake.targetInFlightCount("service1", a)
 	assert.Equal(t, 1, count, "the new target is still holding its request")
 	assert.Empty(t, fake.forgotten())
 
@@ -313,11 +370,7 @@ func TestRouter_ForgetTarget_WhenTheServiceIsRemovedDuringTheDrain(t *testing.T)
 		t.Fatal("the request never reached the target")
 	}
 
-	deployed := make(chan struct{})
-	go func() {
-		defer close(deployed)
-		testDeploy(t, router, b)
-	}()
+	deployed := testDeployInBackground(router, b)
 
 	require.Eventually(t, func() bool {
 		return router.serviceForName("service1").ActiveLoadBalancer().Targets().Names()[0] == b
@@ -328,7 +381,7 @@ func TestRouter_ForgetTarget_WhenTheServiceIsRemovedDuringTheDrain(t *testing.T)
 
 	close(release)
 	<-done
-	<-deployed
+	require.NoError(t, <-deployed)
 
 	assert.ElementsMatch(t, testForgotten(a, b), fake.forgotten())
 

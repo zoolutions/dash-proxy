@@ -62,7 +62,8 @@ func (q *queueTrace) connectionWait() time.Duration {
 	return q.wait
 }
 
-// upstreamTTFB is zero when the target answered before the request was written.
+// upstreamTTFB is zero, meaning not measured, when the target answered before the
+// request was written.
 func (q *queueTrace) upstreamTTFB() time.Duration {
 	q.lock.Lock()
 	defer q.lock.Unlock()

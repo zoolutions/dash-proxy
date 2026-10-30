@@ -235,7 +235,8 @@ A target's series are deleted once a deploy has dropped its address and its
 requests have drained, and straight away on `remove`, which does not drain. The
 access log gains `queue_time` and
 `upstream_ttfb`, in nanoseconds like `duration`, on every response that came from
-a target.
+a target. `upstream_ttfb` is left out, and out of its histogram, when a target
+answers before the request is fully written.
 
 Things worth knowing:
 

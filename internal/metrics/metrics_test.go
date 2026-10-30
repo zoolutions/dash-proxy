@@ -130,6 +130,16 @@ func TestPrometheusTracker_TargetMetrics(t *testing.T) {
 	}, testTargetSeries(t, "service1", "web-1:3000"))
 }
 
+// Zero is how a target answering before the request was written reads: no
+// measurement, and a sample would pull the histogram down.
+func TestPrometheusTracker_LeavesAnUnmeasuredTTFBOutOfTheHistogram(t *testing.T) {
+	Enable()
+
+	Tracker.TrackTargetRequest("service4", "web-1:3000", time.Millisecond, 0, "proxy")
+
+	assert.Equal(t, map[string]int{"kamal_proxy_target_queue_seconds": 1}, testTargetSeries(t, "service4", "web-1:3000"))
+}
+
 func TestPrometheusTracker_ForgetTargetDropsOnlyThatTarget(t *testing.T) {
 	Enable()
 
@@ -152,8 +162,9 @@ func TestTargetQueueBucketsSeconds_MirrorTheWindowsBounds(t *testing.T) {
 	buckets := targetQueueBucketsSeconds()
 
 	require.Len(t, buckets, len(TargetQueueBucketsMs))
-	assert.InDelta(t, 0.001, buckets[0], 1e-9)
-	assert.InDelta(t, 5, buckets[len(buckets)-1], 1e-9)
+	for i, bound := range TargetQueueBucketsMs {
+		assert.InDelta(t, bound/1000, buckets[i], 1e-9)
+	}
 }
 
 // What each request pays with --metrics-port set. SetTargetInFlight runs twice per

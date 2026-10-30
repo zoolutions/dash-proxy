@@ -117,34 +117,61 @@ func (s *Service) allTargets() TargetList {
 	return targets
 }
 
+// liveTargets is every target a service has, or none once it is gone. The caller
+// holds the router's lock.
+func (r *Router) liveTargets(name string) TargetList {
+	service := r.services.Get(name)
+	if service == nil {
+		return TargetList{}
+	}
+
+	return service.allTargets()
+}
+
+// handOverTargets runs before a replaced load balancer drains. A replaced target
+// whose address lives on shares its series with its successor, and writing to
+// them through the drain would overwrite the successor's count, so it goes quiet
+// now and the successor reports. What it finishes during the drain goes uncounted.
+func (r *Router) handOverTargets(name string, replaced *LoadBalancer) {
+	r.withWriteLock(func() error {
+		live := r.liveTargets(name)
+		kept := live.Names()
+		shared := replaced.Targets().Names()
+
+		for _, target := range replaced.Targets() {
+			if slices.Contains(kept, target.Address()) {
+				target.silenceMetrics()
+			}
+		}
+
+		for _, target := range live {
+			if slices.Contains(shared, target.Address()) {
+				target.refreshInFlight(name)
+			}
+		}
+
+		return nil
+	})
+}
+
 // forgetDroppedTargets deletes the series of the addresses a replaced load
-// balancer took with it. It is a set difference, because a deploy usually keeps
-// some of its addresses, and those keep their history. It is taken against both
-// of the service's slots, because an address leaving one can be serving in the
-// other. Not in LoadBalancer.Dispose: that runs on failed deploys as well, when
-// the replaced balancer is still the one serving.
-//
-// A replaced target whose address lives on shared its gauge with its successor,
-// and has just drained it to zero, so its successor reports its count again.
+// balancer took with it, once it has drained. It is a set difference, because a
+// deploy usually keeps some of its addresses, and those keep their history. It is
+// taken against both of the service's slots, because an address leaving one can be
+// serving in the other, and under the router's lock, because a concurrent deploy
+// bringing an address back would otherwise lose the series to this deletion. Not
+// in LoadBalancer.Dispose: that runs on failed deploys as well, when the replaced
+// balancer is still the one serving.
 func (r *Router) forgetDroppedTargets(name string, replaced *LoadBalancer) {
-	live := TargetList{}
-	if service := r.serviceForName(name); service != nil {
-		live = service.allTargets()
-	}
-	kept := live.Names()
-	shared := replaced.Targets().Names()
+	r.withWriteLock(func() error {
+		kept := r.liveTargets(name).Names()
 
-	for _, target := range replaced.Targets() {
-		if slices.Contains(kept, target.Address()) {
-			target.silenceMetrics()
-		} else {
-			target.forgetMetrics(name)
+		for _, target := range replaced.Targets() {
+			if !slices.Contains(kept, target.Address()) {
+				target.forgetMetrics(name)
+			}
 		}
-	}
 
-	for _, target := range live {
-		if slices.Contains(shared, target.Address()) {
-			target.refreshInFlight(name)
-		}
-	}
+		return nil
+	})
 }

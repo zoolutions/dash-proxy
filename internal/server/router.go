@@ -401,6 +401,7 @@ func (r *Router) DeployService(name string, targetURLs, readerURLs []string, opt
 
 	if replaced != nil {
 		replaced.Dispose()
+		r.handOverTargets(name, replaced)
 		replaced.DrainAll(deploymentOptions.DrainTimeout)
 		r.forgetDroppedTargets(name, replaced)
 	}
@@ -435,6 +436,7 @@ func (r *Router) SetRolloutTargets(name string, targetURLs, readerURLs []string,
 
 	if replaced != nil {
 		replaced.Dispose()
+		r.handOverTargets(name, replaced)
 		replaced.DrainAll(deploymentOptions.DrainTimeout)
 		r.forgetDroppedTargets(name, replaced)
 	}
@@ -468,25 +470,23 @@ func (r *Router) StopRollout(name string) error {
 func (r *Router) RemoveService(name string) error {
 	defer r.saveStateSnapshot()
 
-	var removed *Service
-
 	err := r.withWriteLock(func() error {
-		removed = r.services.Get(name)
-		if removed == nil {
+		service := r.services.Get(name)
+		if service == nil {
 			return ErrorServiceNotFound
 		}
 
-		removed.Dispose()
-		r.services.Remove(removed.name)
+		service.Dispose()
+		r.services.Remove(service.name)
+
+		for _, target := range service.allTargets() {
+			target.forgetMetrics(name)
+		}
 
 		return nil
 	})
 	if err != nil {
 		return err
-	}
-
-	for _, target := range removed.allTargets() {
-		target.forgetMetrics(name)
 	}
 
 	if r.dynamicDomainManager != nil {

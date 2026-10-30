@@ -35,8 +35,8 @@ func TestParseServerTimingQueue(t *testing.T) {
 		{name: "dur without a value", headers: []string{"queue;dur"}},
 		{name: "non-numeric dur", headers: []string{"queue;dur=soon"}},
 
-		// All of these reach the window otherwise, and JSON cannot carry the first
-		// three: one of them from the app would fail every `list --json`.
+		// None of these is a duration. Converting the first four to one is
+		// implementation-defined, so a garbage number would reach the window.
 		{name: "NaN", headers: []string{"queue;dur=NaN"}},
 		{name: "infinity", headers: []string{"queue;dur=Inf"}},
 		{name: "out of float range", headers: []string{"queue;dur=1e999"}},

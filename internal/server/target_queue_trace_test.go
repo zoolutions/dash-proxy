@@ -80,7 +80,9 @@ func TestTarget_FallsBackOnTheWaitForAConnection(t *testing.T) {
 	send := func() {
 		defer wg.Done()
 		req, _ := testLoggedRequest("service1")
-		testServeRequestWithTarget(t, target, httptest.NewRecorder(), req)
+		if claimed, err := target.StartRequest(req); assert.NoError(t, err) {
+			target.SendRequest(httptest.NewRecorder(), claimed)
+		}
 	}
 
 	wg.Add(1)

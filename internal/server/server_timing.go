@@ -39,8 +39,8 @@ func parseServerTimingQueue(headers []string) (time.Duration, bool) {
 }
 
 // parseServerTimingDuration rejects more than ParseFloat does. It accepts NaN and
-// Inf, and the app is what wrote this: either one in a window would make every
-// `list --json` fail to marshal.
+// Inf, and the app is what wrote this: converting either of those, or a float out
+// of range, to a time.Duration is implementation-defined.
 func parseServerTimingDuration(param string) (time.Duration, bool) {
 	name, value, found := strings.Cut(param, "=")
 	if !found || !strings.EqualFold(strings.TrimSpace(name), serverTimingDuration) {

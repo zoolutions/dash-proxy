@@ -517,7 +517,11 @@ func (p *prometheusTracker) TrackDenial(service, rule string) {
 
 func (p *prometheusTracker) TrackTargetRequest(service, target string, queue, ttfb time.Duration, source string) {
 	p.targetQueue.WithLabelValues(service, target).Observe(queue.Seconds())
-	p.targetTTFB.WithLabelValues(service, target).Observe(ttfb.Seconds())
+
+	// Zero means not measured: the target answered before the request was written.
+	if ttfb > 0 {
+		p.targetTTFB.WithLabelValues(service, target).Observe(ttfb.Seconds())
+	}
 }
 
 func (p *prometheusTracker) SetTargetInFlight(service, target string, n int) {

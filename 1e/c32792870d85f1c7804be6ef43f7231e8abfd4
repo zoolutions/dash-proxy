@@ -1,0 +1,85 @@
+internal/server/cache_revalidation_test.go
+  s_1110b8d40b9b2e::t_23a5fa32f862bc 105-134
+internal/server/router_target_metrics_test.go
+  s_1110b8d40b9b2e::t_f66708fadde2b3 125-128,142-148
+  s_1110b8d40b9b2e::t_e43537894da8ce 1-115,119-124,129-141,149-333
+  s_1110b8d40b9b2e::t_f48e10530d87d9 116-118
+internal/metrics/metrics.go
+  s_1110b8d40b9b2e::t_a28d3724156a92 518-536,539-545
+  s_1110b8d40b9b2e::t_deb1674027c75a 153-164
+  s_1110b8d40b9b2e::t_4e7b7ee82c53c1 14-18
+  s_1110b8d40b9b2e::t_be477e8ed79970 183-186
+  s_1110b8d40b9b2e::t_69e3fc0455b4ad 431-433
+  s_1110b8d40b9b2e::t_d8165f7f4bc783 38-40
+  s_1110b8d40b9b2e::t_bb3d5703acae3d 213-217
+  s_1110b8d40b9b2e::t_1c3b3b1aa4568f 363-394
+internal/server/cert_metrics_test.go
+  s_1110b8d40b9b2e::t_d15b0c68313524 4
+  s_1110b8d40b9b2e::t_7d5d7c2a71f668 71-72
+  s_1110b8d40b9b2e::t_505e616d870242 134-170
+  s_1110b8d40b9b2e::t_7189381cf70175 39-42,49-52
+internal/server/target.go
+  s_1110b8d40b9b2e::t_701b90653e1e42 189
+  s_1110b8d40b9b2e::t_6c0fcbae3dfc8e 389
+  s_1110b8d40b9b2e::t_364f086ac3951e 160-165
+  s_1110b8d40b9b2e::t_b009af02dbb47a 452-460,463
+  s_1110b8d40b9b2e::t_16563917216c82 589
+  s_1110b8d40b9b2e::t_f93885b54f1385 243
+internal/server/target_queue.go
+  s_1110b8d40b9b2e::t_414f214c33341d 1-156
+internal/server/target_queue_test.go
+  ai_agent 158
+  s_1110b8d40b9b2e::t_4e23686ceabeb0 1-132,134-157,159-209
+  s_1110b8d40b9b2e::t_deb29267ccd203 133
+internal/server/target_queue_trace.go
+  ai_agent 19-23
+  s_1110b8d40b9b2e::t_94256fd11b4d20 1-18,24-121
+internal/server/target_queue_trace_test.go
+  s_1110b8d40b9b2e::t_2183789dfd4d19 1-314
+internal/server/logging_middleware_test.go
+  s_1110b8d40b9b2e::t_8f2a0cffc8cbad 12
+  s_1110b8d40b9b2e::t_b9a704649266ce 151-208
+README.md
+  s_1110b8d40b9b2e::t_3d4438770e2b33 176-253
+internal/server/router.go
+  s_1110b8d40b9b2e::t_ecef8781f1660f 560,565
+  s_1110b8d40b9b2e::t_aabc7338cffbcd 405
+  s_1110b8d40b9b2e::t_fa010f944a2651 471-472,474-475,479-480,488-489
+  s_1110b8d40b9b2e::t_bb642ad1aa26d1 83-84
+  s_1110b8d40b9b2e::t_cd7d3fc7b22346 439
+internal/server/request_start_middleware_test.go
+  s_1110b8d40b9b2e::t_ebe7c1f0e752eb 31-78
+internal/server/logging_middleware.go
+  s_1110b8d40b9b2e::t_6ee90073afcaed 33-38
+  s_1110b8d40b9b2e::t_922dc8cb050380 128-135
+internal/metrics/metrics_test.go
+  s_1110b8d40b9b2e::t_e69079d8cf8d61 8
+  s_1110b8d40b9b2e::t_cff06c7d0836e5 95-158
+internal/server/target_metrics.go
+  s_1110b8d40b9b2e::t_fd5bbbb9716dd9 1-119
+internal/server/request_start_middleware.go
+  s_1110b8d40b9b2e::t_8d0bf95231acd0 25-26,28,30-34
+  s_1110b8d40b9b2e::t_0b2b16d0ba3546 10-11
+internal/server/server_timing_test.go
+  s_1110b8d40b9b2e::t_9107e3a165ef8e 1-69
+internal/server/server_timing.go
+  s_1110b8d40b9b2e::t_23502971684373 1-78
+internal/server/cache_middleware.go
+  s_1110b8d40b9b2e::t_2780c6761dcbc6 328-330
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1ec32792870d85f1c7804be6ef43f7231e8abfd4",
+  "prompts": {},
+  "sessions": {
+    "s_1110b8d40b9b2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1427d55-2225-49d5-afe1-6e55564c3460",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}

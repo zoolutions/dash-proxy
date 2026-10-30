@@ -165,6 +165,106 @@ func TestRouter_ForgetTarget_WaitsForTheDrain(t *testing.T) {
 	assert.Equal(t, testForgotten(a), fake.forgotten())
 }
 
+// Old and new target share one gauge when a redeploy keeps the address. The old
+// one's last request reports zero as it ends, which must not stand as the count
+// for an address the new target is busy on.
+func TestRouter_RedeployToTheSameAddressLeavesTheLiveInFlightCount(t *testing.T) {
+	fake := installFakeTracker(t)
+	router := testRouter(t)
+
+	startedOld, startedNew := make(chan struct{}), make(chan struct{})
+	releaseOld, releaseNew := make(chan struct{}), make(chan struct{})
+
+	_, a := testBackendWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/old":
+			close(startedOld)
+			<-releaseOld
+		case "/new":
+			close(startedNew)
+			<-releaseNew
+		}
+	})
+
+	send := func(path string) <-chan struct{} {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			req, _ := testLoggedRequest("service1")
+			req.URL.Path = path
+			router.ServeHTTP(httptest.NewRecorder(), req)
+		}()
+		return done
+	}
+
+	testDeploy(t, router, a)
+	original := router.serviceForName("service1").ActiveLoadBalancer()
+
+	oldDone := send("/old")
+	<-startedOld
+
+	deployed := make(chan struct{})
+	go func() {
+		defer close(deployed)
+		testDeploy(t, router, a)
+	}()
+
+	require.Eventually(t, func() bool {
+		return router.serviceForName("service1").ActiveLoadBalancer() != original
+	}, time.Second, time.Millisecond)
+
+	newDone := send("/new")
+	<-startedNew
+
+	close(releaseOld)
+	<-oldDone
+	<-deployed
+
+	count, ok := fake.targetInFlightCount("service1", a)
+	assert.True(t, ok)
+	assert.Equal(t, 1, count, "the new target is still holding its request")
+	assert.Empty(t, fake.forgotten())
+
+	close(releaseNew)
+	<-newDone
+
+	count, _ = fake.targetInFlightCount("service1", a)
+	assert.Equal(t, 0, count)
+}
+
+// A drain gives up at its timeout, so a request can end after the deploy is over.
+// By then its target has no say in a count that belongs to its successor.
+func TestRouter_ARequestOutlivingTheDrainLeavesTheLiveInFlightCount(t *testing.T) {
+	fake := installFakeTracker(t)
+	router := testRouter(t)
+	a := testHealthyBackend(t)
+
+	testDeploy(t, router, a)
+	replaced := router.serviceForName("service1").ActiveLoadBalancer().Targets()[0]
+
+	straggler, _ := testLoggedRequest("service1")
+	straggler, err := replaced.StartRequest(straggler)
+	require.NoError(t, err)
+
+	options := defaultDeploymentOptions
+	options.DrainTimeout = time.Millisecond
+	require.NoError(t, router.DeployService("service1", []string{a}, defaultEmptyReaders, defaultServiceOptions, defaultTargetOptions, options))
+
+	current := router.serviceForName("service1").ActiveLoadBalancer().Targets()[0]
+	require.NotSame(t, replaced, current)
+
+	held, _ := testLoggedRequest("service1")
+	held, err = current.StartRequest(held)
+	require.NoError(t, err)
+	defer current.endInflightRequest(held)
+
+	replaced.endInflightRequest(straggler)
+
+	count, ok := fake.targetInFlightCount("service1", a)
+	assert.True(t, ok)
+	assert.Equal(t, 1, count)
+}
+
 func TestRouter_ListActiveServices_TargetDetails(t *testing.T) {
 	router := testRouter(t)
 	reader := testHealthyBackend(t)

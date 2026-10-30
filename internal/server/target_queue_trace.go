@@ -100,6 +100,9 @@ func (t *Target) traceRequest(req *httputil.ProxyRequest) {
 // that stops answering records nothing at all.
 func (t *Target) recordQueueTime(res *http.Response) {
 	trace, _ := res.Request.Context().Value(contextKeyQueueTrace).(*queueTrace)
+	if trace == nil {
+		return
+	}
 
 	queue, source := trace.connectionWait(), queueSourceProxy
 	if reported, ok := parseServerTimingQueue(res.Header["Server-Timing"]); ok {

@@ -56,7 +56,7 @@ func (t *Target) InFlight() int {
 // publishInFlight runs under the inflight lock: emitted outside it, two requests
 // ending together could leave the gauge on the older of the two counts.
 func (t *Target) publishInFlight(service string) {
-	if !t.metricsForgotten {
+	if !t.metricsSilenced {
 		metrics.Tracker.SetTargetInFlight(service, t.Address(), len(t.inflight))
 	}
 }
@@ -65,9 +65,27 @@ func (t *Target) trackRequest(service string, queue, ttfb time.Duration, source 
 	t.inflightLock.Lock()
 	defer t.inflightLock.Unlock()
 
-	if !t.metricsForgotten {
+	if !t.metricsSilenced {
 		metrics.Tracker.TrackTargetRequest(service, t.Address(), queue, ttfb, source)
 	}
+}
+
+// refreshInFlight publishes the count as it stands, for when something other than
+// a request starting or ending has moved the gauge.
+func (t *Target) refreshInFlight(service string) {
+	t.inflightLock.Lock()
+	defer t.inflightLock.Unlock()
+
+	t.publishInFlight(service)
+}
+
+// silenceMetrics stops this target writing to its series, which stay. It is for a
+// replaced target whose address lives on: the series now belong to its successor.
+func (t *Target) silenceMetrics() {
+	t.inflightLock.Lock()
+	defer t.inflightLock.Unlock()
+
+	t.metricsSilenced = true
 }
 
 // forgetMetrics deletes this target's series for good. A target dropped from its
@@ -79,7 +97,7 @@ func (t *Target) forgetMetrics(service string) {
 	t.inflightLock.Lock()
 	defer t.inflightLock.Unlock()
 
-	t.metricsForgotten = true
+	t.metricsSilenced = true
 	metrics.Tracker.ForgetTarget(service, t.Address())
 }
 
@@ -105,15 +123,25 @@ func (s *Service) allTargets() TargetList {
 // of the service's slots, because an address leaving one can be serving in the
 // other. Not in LoadBalancer.Dispose: that runs on failed deploys as well, when
 // the replaced balancer is still the one serving.
+//
+// A replaced target whose address lives on shared its gauge with its successor,
+// and has just drained it to zero, so the live targets report their count again.
 func (r *Router) forgetDroppedTargets(name string, replaced *LoadBalancer) {
-	kept := []string{}
+	live := TargetList{}
 	if service := r.serviceForName(name); service != nil {
-		kept = service.allTargets().Names()
+		live = service.allTargets()
 	}
+	kept := live.Names()
 
 	for _, target := range replaced.Targets() {
-		if !slices.Contains(kept, target.Address()) {
+		if slices.Contains(kept, target.Address()) {
+			target.silenceMetrics()
+		} else {
 			target.forgetMetrics(name)
 		}
+	}
+
+	for _, target := range live {
+		target.refreshInFlight(name)
 	}
 }

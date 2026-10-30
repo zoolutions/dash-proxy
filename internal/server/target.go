@@ -161,8 +161,8 @@ type Target struct {
 	// queue is the trailing window of queue times; see target_queue.go. It is on
 	// the target rather than its address, so a redeploy starts an empty one.
 	queue *queueWindow
-	// metricsForgotten is guarded by inflightLock; see forgetMetrics.
-	metricsForgotten bool
+	// metricsSilenced is guarded by inflightLock; see forgetMetrics.
+	metricsSilenced bool
 }
 
 func NewTarget(targetURL string, options TargetOptions) (*Target, error) {

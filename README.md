@@ -231,8 +231,9 @@ With `--metrics-port` set, the same measurements go to Prometheus:
 | `kamal_proxy_target_upstream_ttfb_seconds` | histogram | `service`, `target` |
 | `kamal_proxy_target_in_flight` | gauge | `service`, `target` |
 
-A target's series are deleted once a deploy or `remove` has dropped its address
-and its requests have drained. The access log gains `queue_time` and
+A target's series are deleted once a deploy has dropped its address and its
+requests have drained, and straight away on `remove`, which does not drain. The
+access log gains `queue_time` and
 `upstream_ttfb`, in nanoseconds like `duration`, on every response that came from
 a target.
 

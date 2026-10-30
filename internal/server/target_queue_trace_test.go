@@ -267,6 +267,83 @@ func TestRetry_OnlyTheAttemptThatAnsweredIsMeasured(t *testing.T) {
 	assert.Equal(t, 1, testQueueSnapshot(lb.Targets()[1]).Requests)
 }
 
+// Unlike the draining target above, this one is really tried: the first attempt
+// is forwarded and fails on the wire before the second gets its answer.
+func TestRetry_AnAttemptThatFailedOnTheWireIsNotMeasured(t *testing.T) {
+	fake := installFakeTracker(t)
+
+	dead, deadAddress := testBackendWithHandler(t, func(w http.ResponseWriter, r *http.Request) {})
+	_, liveAddress := testBackendWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server-Timing", "queue;dur=7")
+	})
+
+	targets, err := NewTargetList([]string{deadAddress, liveAddress}, []string{}, defaultTargetOptions)
+	require.NoError(t, err)
+
+	lb := NewLoadBalancer(targets, 0, false).WithRetryPolicy(RetryPolicy{TryDuration: time.Second})
+	t.Cleanup(lb.Dispose)
+	lb.MarkAllHealthy()
+	targets.StopHealthChecks()
+
+	dead.Close()
+
+	// Round robin hands each target every other request, so sending two puts one
+	// first attempt on the dead target whichever it starts from.
+	for range 2 {
+		req, logging := testLoggedRequest("service1")
+		w := httptest.NewRecorder()
+		lb.StartRequest(w, req)()
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, liveAddress, logging.Target)
+		assert.Equal(t, 7*time.Millisecond, logging.QueueTime)
+	}
+
+	assert.Equal(t, 0, testQueueSnapshot(targets[0]).Requests)
+	assert.Equal(t, 2, testQueueSnapshot(targets[1]).Requests)
+
+	samples := fake.targetRequestSamples()
+	require.Len(t, samples, 2)
+	for _, sample := range samples {
+		assert.Equal(t, liveAddress, sample.target)
+	}
+}
+
+// Every response comes through the Rewrite hook today. Should a handler ever not,
+// it has to pass through unmeasured rather than panic on the request's goroutine.
+func TestTarget_AResponseWithoutATraceIsNotMeasured(t *testing.T) {
+	fake := installFakeTracker(t)
+	target := testTarget(t, func(w http.ResponseWriter, r *http.Request) {})
+
+	req, logging := testLoggedRequest("service1")
+	res := &http.Response{Request: req, Header: http.Header{"Server-Timing": {"queue;dur=7"}}}
+
+	require.NotPanics(t, func() { require.NoError(t, target.modifyResponse(res)) })
+
+	assert.False(t, logging.Measured)
+	assert.Equal(t, 0, testQueueSnapshot(target).Requests)
+	assert.Empty(t, fake.targetRequestSamples())
+}
+
+// A target replaced by another at the same address must stop writing to the
+// series the two share, or its last count outlives it.
+func TestTarget_EmitsNothingOnceSilenced(t *testing.T) {
+	fake := installFakeTracker(t)
+	target := testTarget(t, func(w http.ResponseWriter, r *http.Request) {})
+
+	req, _ := testLoggedRequest("service1")
+	req, err := target.StartRequest(req)
+	require.NoError(t, err)
+
+	target.silenceMetrics()
+	target.SendRequest(httptest.NewRecorder(), req)
+
+	count, _ := fake.targetInFlightCount("service1", target.Address())
+	assert.Equal(t, 1, count, "the request's end went unreported")
+	assert.Empty(t, fake.targetRequestSamples())
+	assert.Empty(t, fake.forgotten(), "the series are not this target's alone to delete")
+}
+
 // The transport re-fires the hooks when a pooled connection turns out to be dead,
 // and writes and reads on goroutines of its own, in whichever order the target
 // answers.

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +90,101 @@ func TestSetTracker_IsSafeUnderConcurrentEmission(t *testing.T) {
 	}
 	SetTracker(original)
 	<-done
+}
+
+// testTargetSeries reports, per metric, how many series carry this service and
+// target, read back from what a scrape would see.
+func testTargetSeries(t *testing.T, service, target string) map[string]int {
+	t.Helper()
+
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.NoError(t, err)
+
+	series := map[string]int{}
+	for _, family := range families {
+		for _, metric := range family.GetMetric() {
+			labels := map[string]string{}
+			for _, label := range metric.GetLabel() {
+				labels[label.GetName()] = label.GetValue()
+			}
+
+			if labels["service"] == service && labels["target"] == target {
+				series[family.GetName()]++
+			}
+		}
+	}
+
+	return series
+}
+
+func TestPrometheusTracker_TargetMetrics(t *testing.T) {
+	Enable()
+
+	Tracker.TrackTargetRequest("service1", "web-1:3000", 12*time.Millisecond, 40*time.Millisecond, "app")
+	Tracker.SetTargetInFlight("service1", "web-1:3000", 3)
+
+	assert.Equal(t, map[string]int{
+		"kamal_proxy_target_queue_seconds":         1,
+		"kamal_proxy_target_upstream_ttfb_seconds": 1,
+		"kamal_proxy_target_in_flight":             1,
+	}, testTargetSeries(t, "service1", "web-1:3000"))
+}
+
+// Zero is how a target answering before the request was written reads: no
+// measurement, and a sample would pull the histogram down.
+func TestPrometheusTracker_LeavesAnUnmeasuredTTFBOutOfTheHistogram(t *testing.T) {
+	Enable()
+
+	Tracker.TrackTargetRequest("service4", "web-1:3000", time.Millisecond, 0, "proxy")
+
+	assert.Equal(t, map[string]int{"kamal_proxy_target_queue_seconds": 1}, testTargetSeries(t, "service4", "web-1:3000"))
+}
+
+func TestPrometheusTracker_ForgetTargetDropsOnlyThatTarget(t *testing.T) {
+	Enable()
+
+	for _, target := range []string{"web-2:3000", "web-3:3000"} {
+		Tracker.TrackTargetRequest("service2", target, time.Millisecond, time.Millisecond, "proxy")
+		Tracker.SetTargetInFlight("service2", target, 1)
+	}
+	Tracker.SetTargetInFlight("service3", "web-2:3000", 1)
+
+	Tracker.ForgetTarget("service2", "web-2:3000")
+
+	assert.Empty(t, testTargetSeries(t, "service2", "web-2:3000"))
+	assert.Len(t, testTargetSeries(t, "service2", "web-3:3000"), 3)
+	assert.Len(t, testTargetSeries(t, "service3", "web-2:3000"), 1, "the same address on another service is a different target")
+}
+
+// The window and the histogram must bucket a request alike, so a dashboard and
+// the autoscaler cannot disagree about which side of a bound it fell on.
+func TestTargetQueueBucketsSeconds_MirrorTheWindowsBounds(t *testing.T) {
+	buckets := targetQueueBucketsSeconds()
+
+	require.Len(t, buckets, len(TargetQueueBucketsMs))
+	for i, bound := range TargetQueueBucketsMs {
+		assert.InDelta(t, bound/1000, buckets[i], 1e-9)
+	}
+}
+
+// What each request pays with --metrics-port set. SetTargetInFlight runs twice per
+// request, and on the way in that is under the load balancer's lock.
+func BenchmarkPrometheusTracker_SetTargetInFlight(b *testing.B) {
+	Enable()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		Tracker.SetTargetInFlight("service1", "web-1:3000", 3)
+	}
+}
+
+func BenchmarkPrometheusTracker_TrackTargetRequest(b *testing.B) {
+	Enable()
+
+	b.ReportAllocs()
+	for b.Loop() {
+		Tracker.TrackTargetRequest("service1", "web-1:3000", 12*time.Millisecond, 40*time.Millisecond, "app")
+	}
 }
 
 func TestNormalizeMethod(t *testing.T) {

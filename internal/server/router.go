@@ -80,6 +80,8 @@ type ServiceDescription struct {
 	Targets        []string `json:"targets,omitempty"`
 	ReaderTargets  []string `json:"reader_targets,omitempty"`
 	RolloutTargets []string `json:"rollout_targets,omitempty"`
+
+	TargetDetails []TargetDescription `json:"target_details,omitempty"`
 }
 
 type ServiceDescriptionMap map[string]ServiceDescription
@@ -399,7 +401,9 @@ func (r *Router) DeployService(name string, targetURLs, readerURLs []string, opt
 
 	if replaced != nil {
 		replaced.Dispose()
+		r.handOverTargets(name, replaced)
 		replaced.DrainAll(deploymentOptions.DrainTimeout)
+		r.forgetDroppedTargets(name, replaced)
 	}
 
 	if r.dynamicDomainManager != nil {
@@ -432,7 +436,9 @@ func (r *Router) SetRolloutTargets(name string, targetURLs, readerURLs []string,
 
 	if replaced != nil {
 		replaced.Dispose()
+		r.handOverTargets(name, replaced)
 		replaced.DrainAll(deploymentOptions.DrainTimeout)
+		r.forgetDroppedTargets(name, replaced)
 	}
 
 	slog.Info("Deployed for rollout", "service", name, "targets", targetURLs)
@@ -472,6 +478,10 @@ func (r *Router) RemoveService(name string) error {
 
 		service.Dispose()
 		r.services.Remove(service.name)
+
+		for _, target := range service.allTargets() {
+			target.forgetMetrics(name)
+		}
 
 		return nil
 	})
@@ -547,10 +557,12 @@ func (r *Router) ListActiveServices() ServiceDescriptionMap {
 					PathPrefixes:  service.options.PathPrefixes,
 					Targets:       service.active.WriteTargets().Names(),
 					ReaderTargets: service.active.ReadTargets().Names(),
+					TargetDetails: service.active.Targets().describe(TargetSlotActive),
 				}
 
 				if service.rollout != nil {
 					description.RolloutTargets = service.rollout.Targets().Names()
+					description.TargetDetails = append(description.TargetDetails, service.rollout.Targets().describe(TargetSlotRollout)...)
 				}
 
 				result[name] = description

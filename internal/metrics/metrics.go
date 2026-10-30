@@ -11,6 +11,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// TargetQueueBucketsMs are the upper bounds of a target's queue time buckets. The
+// Prometheus histogram and the 60 s window in list --json share them, so a
+// dashboard and the autoscaler bucket a request the same way.
+var TargetQueueBucketsMs = [...]float64{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000}
+
 // EventTracker is the sink for metric emissions. The process-wide instance is
 // reached through Tracker and swapped with SetTracker.
 type EventTracker interface {
@@ -30,6 +35,9 @@ type EventTracker interface {
 	TrackDynamicRedirectPoll(service, outcome string)
 	TrackDynamicRedirect(service string, status int)
 	TrackDenial(service, rule string)
+	TrackTargetRequest(service, target string, queue, ttfb time.Duration, source string)
+	SetTargetInFlight(service, target string, n int)
+	ForgetTarget(service, target string)
 }
 
 // Tracker delegates every emission to the tracker SetTracker installed last (a
@@ -142,6 +150,18 @@ func (d *delegatingTracker) TrackDenial(service, rule string) {
 	d.active().TrackDenial(service, rule)
 }
 
+func (d *delegatingTracker) TrackTargetRequest(service, target string, queue, ttfb time.Duration, source string) {
+	d.active().TrackTargetRequest(service, target, queue, ttfb, source)
+}
+
+func (d *delegatingTracker) SetTargetInFlight(service, target string, n int) {
+	d.active().SetTargetInFlight(service, target, n)
+}
+
+func (d *delegatingTracker) ForgetTarget(service, target string) {
+	d.active().ForgetTarget(service, target)
+}
+
 type nullTracker struct{}
 
 func (nullTracker) TrackRequest(service, method string, status int, dur time.Duration)        {}
@@ -160,6 +180,10 @@ func (nullTracker) SetDynamicRedirects(service string, hosts, rules int)        
 func (nullTracker) TrackDynamicRedirectPoll(service, outcome string)                          {}
 func (nullTracker) TrackDynamicRedirect(service string, status int)                           {}
 func (nullTracker) TrackDenial(service, rule string)                                          {}
+func (nullTracker) TrackTargetRequest(service, target string, queue, ttfb time.Duration, source string) {
+}
+func (nullTracker) SetTargetInFlight(service, target string, n int) {}
+func (nullTracker) ForgetTarget(service, target string)             {}
 
 type prometheusTracker struct {
 	httpRequests     *prometheus.CounterVec
@@ -186,6 +210,11 @@ type prometheusTracker struct {
 
 	// Deny rule metrics
 	denials *prometheus.CounterVec
+
+	// Per-target metrics
+	targetQueue    *prometheus.HistogramVec
+	targetTTFB     *prometheus.HistogramVec
+	targetInFlight *prometheus.GaugeVec
 }
 
 func NewPrometheusTracker() *prometheusTracker {
@@ -331,6 +360,38 @@ func NewPrometheusTracker() *prometheusTracker {
 			[]string{"service", "rule"},
 		),
 
+		targetQueue: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:      "target_queue_seconds",
+				Namespace: "kamal",
+				Subsystem: "proxy",
+				Help:      "How long requests waited before the target started on them, labeled by service and target: the app's Server-Timing queue metric when it sends one, otherwise the proxy's wait for a connection to the target.",
+				Buckets:   targetQueueBucketsSeconds(),
+			},
+			[]string{"service", "target"},
+		),
+
+		targetTTFB: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:      "target_upstream_ttfb_seconds",
+				Namespace: "kamal",
+				Subsystem: "proxy",
+				Help:      "Time from the request being written to the target's first response byte, labeled by service and target.",
+				Buckets:   prometheus.DefBuckets,
+			},
+			[]string{"service", "target"},
+		),
+
+		targetInFlight: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name:      "target_in_flight",
+				Namespace: "kamal",
+				Subsystem: "proxy",
+				Help:      "Requests currently held by a target, labeled by service and target. A saturated target that stops answering records no queue time; this is what shows it.",
+			},
+			[]string{"service", "target"},
+		),
+
 		certCount: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name:      "certificates_total",
@@ -367,6 +428,9 @@ func NewPrometheusTracker() *prometheusTracker {
 		tracker.dynamicRedirectPolls,
 		tracker.dynamicRedirects,
 		tracker.denials,
+		tracker.targetQueue,
+		tracker.targetTTFB,
+		tracker.targetInFlight,
 	)
 
 	return tracker
@@ -451,7 +515,38 @@ func (p *prometheusTracker) TrackDenial(service, rule string) {
 	p.denials.WithLabelValues(service, rule).Inc()
 }
 
+func (p *prometheusTracker) TrackTargetRequest(service, target string, queue, ttfb time.Duration, source string) {
+	p.targetQueue.WithLabelValues(service, target).Observe(queue.Seconds())
+
+	// Zero means not measured: the target answered before the request was written.
+	if ttfb > 0 {
+		p.targetTTFB.WithLabelValues(service, target).Observe(ttfb.Seconds())
+	}
+}
+
+func (p *prometheusTracker) SetTargetInFlight(service, target string, n int) {
+	p.targetInFlight.WithLabelValues(service, target).Set(float64(n))
+}
+
+// ForgetTarget drops a target's series. Every deploy brings a new target address,
+// so without this the series of containers long gone pile up in the scrape.
+func (p *prometheusTracker) ForgetTarget(service, target string) {
+	labels := prometheus.Labels{"service": service, "target": target}
+
+	p.targetQueue.DeletePartialMatch(labels)
+	p.targetTTFB.DeletePartialMatch(labels)
+	p.targetInFlight.DeletePartialMatch(labels)
+}
+
 // Private
+
+func targetQueueBucketsSeconds() []float64 {
+	buckets := make([]float64, len(TargetQueueBucketsMs))
+	for i, bound := range TargetQueueBucketsMs {
+		buckets[i] = bound / 1000
+	}
+	return buckets
+}
 
 func normalizeMethod(method string) string {
 	switch method {

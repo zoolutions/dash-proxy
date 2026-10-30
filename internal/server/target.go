@@ -157,6 +157,12 @@ type Target struct {
 
 	healthcheck   *HealthCheck
 	stateConsumer TargetStateConsumer
+
+	// queue is the trailing window of queue times; see target_queue.go. It is on
+	// the target rather than its address, so a redeploy starts an empty one.
+	queue *queueWindow
+	// metricsSilenced is guarded by inflightLock; see forgetMetrics.
+	metricsSilenced bool
 }
 
 func NewTarget(targetURL string, options TargetOptions) (*Target, error) {
@@ -180,6 +186,7 @@ func NewTarget(targetURL string, options TargetOptions) (*Target, error) {
 
 		state:    TargetStateAdding,
 		inflight: inflightMap{},
+		queue:    newQueueWindow(),
 	}
 
 	target.proxyHandler = target.createProxyHandler(options.ResponseTimeout)
@@ -233,6 +240,7 @@ func (t *Target) StartRequest(req *http.Request) (*http.Request, error) {
 
 	inflightRequest := &inflightRequest{cancel: cancel}
 	t.inflight[req] = inflightRequest
+	t.publishInFlight(LoggingRequestContext(req).Service)
 
 	return req, nil
 }
@@ -378,7 +386,7 @@ func (t *Target) createProxyHandler(responseTimeout time.Duration) http.Handler 
 	var handler http.Handler = &httputil.ReverseProxy{
 		BufferPool:     bufferPool,
 		Rewrite:        t.rewrite,
-		ModifyResponse: t.applyResponseHeaderRules,
+		ModifyResponse: t.modifyResponse,
 		ErrorHandler:   t.handleProxyError,
 		Transport:      transport,
 	}
@@ -441,9 +449,18 @@ func (t *Target) rewrite(req *httputil.ProxyRequest) {
 	// Last, so a rule can override a header the proxy itself decided on, such as
 	// the X-Forwarded set above.
 	t.options.RequestHeaderRules.apply(req.Out.Header)
+
+	t.traceRequest(req)
 }
 
-// applyResponseHeaderRules runs as the proxy's ModifyResponse hook, which fires
+// modifyResponse is the proxy's ModifyResponse hook. The queue time is read first,
+// so a rule removing Server-Timing from what clients see leaves it measured.
+func (t *Target) modifyResponse(res *http.Response) error {
+	t.recordQueueTime(res)
+	return t.applyResponseHeaderRules(res)
+}
+
+// applyResponseHeaderRules runs in the proxy's ModifyResponse hook, which fires
 // after ReverseProxy has stripped the hop-by-hop headers, so a rule's headers
 // reach the client intact. It never fails: a rule that could not be applied
 // would have been rejected when the service was deployed.
@@ -569,6 +586,7 @@ func (t *Target) endInflightRequest(req *http.Request) {
 	if ok {
 		inflightRequest.cancel(nil)
 		delete(t.inflight, req)
+		t.publishInFlight(LoggingRequestContext(req).Service)
 	}
 }
 

@@ -30,6 +30,12 @@ type loggingRequestContext struct {
 	TraceID    string
 	SpanID     string
 	TraceFlags string
+
+	// QueueTime and UpstreamTTFB are valid when Measured is set, which is once the
+	// target has answered. See Target.recordQueueTime.
+	QueueTime    time.Duration
+	UpstreamTTFB time.Duration
+	Measured     bool
 }
 
 type LoggingMiddleware struct {
@@ -117,6 +123,15 @@ func (h *LoggingMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				slog.String("span_id", loggingRequestContext.SpanID),
 				slog.String("trace_flags", loggingRequestContext.TraceFlags),
 			)
+		}
+
+		// Likewise: nothing is measured on a response the proxy made itself.
+		if loggingRequestContext.Measured {
+			attrs = append(attrs, slog.Int64("queue_time", loggingRequestContext.QueueTime.Nanoseconds()))
+
+			if loggingRequestContext.UpstreamTTFB > 0 {
+				attrs = append(attrs, slog.Int64("upstream_ttfb", loggingRequestContext.UpstreamTTFB.Nanoseconds()))
+			}
 		}
 
 		attrs = append(attrs, h.retrieveCustomHeaders(loggingRequestContext.RequestHeaders, r.Header, "req")...)

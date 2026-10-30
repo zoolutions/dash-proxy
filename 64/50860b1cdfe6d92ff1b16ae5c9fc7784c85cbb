@@ -1,0 +1,19 @@
+internal/server/target_bench_test.go
+  s_1110b8d40b9b2e::t_e42eb7283a647f 1-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6450860b1cdfe6d92ff1b16ae5c9fc7784c85cbb",
+  "prompts": {},
+  "sessions": {
+    "s_1110b8d40b9b2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1427d55-2225-49d5-afe1-6e55564c3460",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}

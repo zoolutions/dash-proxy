@@ -1,4 +1,4 @@
-FROM golang:1.26.10 AS build
+FROM golang:1.26.11 AS build
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 RUN make
 
-FROM ubuntu:noble-20261024.1 AS base
+FROM ubuntu:noble-20261110.1 AS base
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /app/bin/dash-proxy /usr/local/bin/

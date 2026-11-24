@@ -1,0 +1,25 @@
+go.mod
+  s_de12721966eec0::t_5768a4beb3e18c 3,11,17,26,28,54,73-75
+  s_de12721966eec0::t_9f7bd751a0dfbc 7
+example/upstream/Dockerfile
+  s_de12721966eec0::t_6c0bf36b6934c7 1
+Dockerfile
+  s_de12721966eec0::t_1083f828c1791c 11
+  s_de12721966eec0::t_6c0bf36b6934c7 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3655e6754768cdd9ab1acf65ce75d5128e790fe1",
+  "prompts": {},
+  "sessions": {
+    "s_de12721966eec0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d2a9cb7f-8bfe-4eec-aa8e-60ed63139b6d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
